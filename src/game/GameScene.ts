@@ -52,10 +52,9 @@ export class GameScene {
     this.map = new WorldMap(app.renderer as import('pixi.js').Renderer);
     this.world.addChild(this.map.container);
 
-    // Player
-    const startX = TILE_SIZE * 5 + TILE_SIZE / 2;
-    const startY = TILE_SIZE * 5 + TILE_SIZE / 2;
-    this.player = new Player(startX, startY);
+    // Player – use findSafeSpawn to guarantee a non-wall tile
+    const spawn = this.map.findSafeSpawn(3, 2);
+    this.player = new Player(spawn.x, spawn.y);
     this.world.addChild(this.player.container);
 
     // Enemies in the field area (avoid walls and edges)
