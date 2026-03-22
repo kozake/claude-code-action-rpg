@@ -53,8 +53,8 @@ export class GameScene {
     this.world.addChild(this.map.container);
 
     // Player
-    const startX = TILE_SIZE * 5;
-    const startY = TILE_SIZE * 5;
+    const startX = TILE_SIZE * 5 + TILE_SIZE / 2;
+    const startY = TILE_SIZE * 5 + TILE_SIZE / 2;
     this.player = new Player(startX, startY);
     this.world.addChild(this.player.container);
 
