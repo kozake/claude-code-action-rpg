@@ -1,6 +1,13 @@
+// ============================================================
+// AudioManager
+// 1. まず ./audio/field.ogg (or .mp3) / boss.ogg を HTML Audio で再生
+// 2. ファイルが存在しない場合は Web Audio API の合成 BGM にフォールバック
+//    → public/audio/ に OGG/MP3 ファイルを追加すれば自動的に使われる
+// ============================================================
+
 type NoteEvent = { freq: number; beats: number; vol: number; type: OscillatorType };
 
-// Field BGM: C major, peaceful exploration, 100 BPM
+// Field BGM fallback: C major, peaceful exploration, 100 BPM
 const FIELD_BPM = 100;
 const FIELD_MELODY: NoteEvent[] = [
   { freq: 261.63, beats: 1, vol: 0.28, type: 'sine' },  // C4
@@ -19,7 +26,7 @@ const FIELD_BASS: NoteEvent[] = [
   { freq: 98.00,  beats: 2, vol: 0.14, type: 'triangle' }, // G2
 ];
 
-// Boss BGM: D minor, intense battle, 160 BPM
+// Boss BGM fallback: D minor, intense battle, 160 BPM
 const BOSS_BPM = 160;
 const BOSS_MELODY: NoteEvent[] = [
   { freq: 293.66, beats: 1,   vol: 0.38, type: 'square' }, // D4
@@ -39,75 +46,116 @@ const BOSS_BASS: NoteEvent[] = [
 ];
 
 export class AudioManager {
+  private fieldHtml: HTMLAudioElement;
+  private bossHtml: HTMLAudioElement;
+  private currentHtml: HTMLAudioElement | null = null;
+
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private started = false;
   private currentTrack: 'field' | 'boss' | null = null;
   private generation = 0;
 
-  // Call this on first user gesture to unlock audio context
+  constructor() {
+    this.fieldHtml = this.createHtmlAudio('./audio/field');
+    this.bossHtml  = this.createHtmlAudio('./audio/boss');
+  }
+
+  private createHtmlAudio(basePath: string): HTMLAudioElement {
+    const audio = new Audio();
+    audio.loop = true;
+    audio.volume = 0.5;
+    audio.preload = 'none';
+    const canOgg = audio.canPlayType('audio/ogg') !== '';
+    audio.src = canOgg ? `${basePath}.ogg` : `${basePath}.mp3`;
+    return audio;
+  }
+
+  // Call on first user gesture to unlock audio context
   unlock() {
-    if (this.ctx) {
-      this.ctx.resume();
-      return;
-    }
     const AC =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-
-    this.ctx = new AC();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.4;
-    this.masterGain.connect(this.ctx.destination);
+    if (!this.ctx && AC) {
+      this.ctx = new AC();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.4;
+      this.masterGain.connect(this.ctx.destination);
+    } else if (this.ctx) {
+      this.ctx.resume();
+    }
     this.started = true;
 
-    if (this.currentTrack === 'field') this.loop('field');
-    else if (this.currentTrack === 'boss') this.loop('boss');
+    if (this.currentTrack === 'field') this.doPlay('field');
+    else if (this.currentTrack === 'boss') this.doPlay('boss');
   }
 
   playField() {
     if (this.currentTrack === 'field') return;
-    this.currentTrack = 'field';
+    this.pauseHtml();
     this.generation++;
-    if (this.started) this.loop('field');
+    this.currentTrack = 'field';
+    if (this.started) this.doPlay('field');
   }
 
   playBoss() {
     if (this.currentTrack === 'boss') return;
-    this.currentTrack = 'boss';
+    this.pauseHtml();
     this.generation++;
-    if (this.started) this.loop('boss');
+    this.currentTrack = 'boss';
+    if (this.started) this.doPlay('boss');
   }
 
   stop() {
-    this.currentTrack = null;
+    this.pauseHtml();
     this.generation++;
+    this.currentTrack = null;
   }
 
-  private loop(track: 'field' | 'boss') {
-    const gen = this.generation;
-    const ctx = this.ctx!;
-    const masterGain = this.masterGain!;
+  private pauseHtml() {
+    if (this.currentHtml) {
+      this.currentHtml.pause();
+      this.currentHtml.currentTime = 0;
+      this.currentHtml = null;
+    }
+  }
 
-    const bpm = track === 'field' ? FIELD_BPM : BOSS_BPM;
+  private doPlay(track: 'field' | 'boss') {
+    const html = track === 'field' ? this.fieldHtml : this.bossHtml;
+
+    // Try HTML Audio first (CLAUDE.md specified files)
+    html.play().then(() => {
+      this.currentHtml = html;
+    }).catch(() => {
+      // File not found or blocked → fall back to Web Audio API synthesis
+      this.currentHtml = null;
+      if (this.ctx && this.masterGain) {
+        this.synthLoop(track, this.generation);
+      }
+    });
+  }
+
+  private synthLoop(track: 'field' | 'boss', gen: number) {
+    if (gen !== this.generation || !this.ctx || !this.masterGain) return;
+
+    const bpm    = track === 'field' ? FIELD_BPM : BOSS_BPM;
     const melody = track === 'field' ? FIELD_MELODY : BOSS_MELODY;
-    const bass = track === 'field' ? FIELD_BASS : BOSS_BASS;
+    const bass   = track === 'field' ? FIELD_BASS : BOSS_BASS;
     const beatSec = 60 / bpm;
-    const startTime = ctx.currentTime + 0.05;
+    const startTime = this.ctx.currentTime + 0.05;
 
     const scheduleNotes = (pattern: NoteEvent[]): number => {
       let t = startTime;
       for (const note of pattern) {
         const dur = note.beats * beatSec;
-        const osc = ctx.createOscillator();
-        const env = ctx.createGain();
+        const osc = this.ctx!.createOscillator();
+        const env = this.ctx!.createGain();
         osc.type = note.type;
         osc.frequency.value = note.freq;
         osc.connect(env);
-        env.connect(masterGain);
+        env.connect(this.masterGain!);
 
-        const attack = Math.min(0.02, dur * 0.1);
+        const attack  = Math.min(0.02, dur * 0.1);
         const release = Math.min(0.08, dur * 0.3);
         env.gain.setValueAtTime(0, t);
         env.gain.linearRampToValueAtTime(note.vol, t + attack);
@@ -124,9 +172,6 @@ export class AudioManager {
     const duration = scheduleNotes(melody);
     scheduleNotes(bass);
 
-    setTimeout(() => {
-      if (this.generation !== gen) return;
-      this.loop(track);
-    }, (duration - 0.05) * 1000);
+    setTimeout(() => this.synthLoop(track, gen), (duration - 0.05) * 1000);
   }
 }
