@@ -1,5 +1,8 @@
 # Claude Code Action RPG - Project Goals
 
+## 言語設定
+ユーザーの母国語は日本語です。会話は常に日本語で行ってください。
+
 ## プロジェクト概要
 楽しいトップダウン2Dアクションリアルタイム戦闘RPGをブラウザで動かす。
 GitHub Pages (github.io) でプレイできるようにする。
