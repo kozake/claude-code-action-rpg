@@ -176,6 +176,32 @@ export class WorldMap {
     return false;
   }
 
+  /** Find the nearest non-wall tile to the desired position (BFS). */
+  findSafeSpawn(col: number, row: number): { x: number; y: number } {
+    if (this.data[row]?.[col] !== TILE.WALL) {
+      return { x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2 };
+    }
+    // BFS to find nearest non-wall tile
+    const visited = new Set<string>();
+    const queue: [number, number][] = [[col, row]];
+    visited.add(`${col},${row}`);
+    while (queue.length > 0) {
+      const [c, r] = queue.shift()!;
+      for (const [dc, dr] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nc = c + dc, nr = r + dr;
+        const key = `${nc},${nr}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        if (nr < 0 || nr >= MAP_ROWS || nc < 0 || nc >= MAP_COLS) continue;
+        if (this.data[nr][nc] !== TILE.WALL) {
+          return { x: nc * TILE_SIZE + TILE_SIZE / 2, y: nr * TILE_SIZE + TILE_SIZE / 2 };
+        }
+        queue.push([nc, nr]);
+      }
+    }
+    return { x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2 };
+  }
+
   getTileAt(wx: number, wy: number): TileType {
     const tc = Math.floor(wx / TILE_SIZE);
     const tr = Math.floor(wy / TILE_SIZE);
