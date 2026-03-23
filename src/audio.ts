@@ -57,17 +57,15 @@ export class AudioManager {
   private generation = 0;
 
   constructor() {
-    this.fieldHtml = this.createHtmlAudio('./audio/field');
-    this.bossHtml  = this.createHtmlAudio('./audio/boss');
+    this.fieldHtml = this.createHtmlAudio();
+    this.bossHtml  = this.createHtmlAudio();
   }
 
-  private createHtmlAudio(basePath: string): HTMLAudioElement {
+  private createHtmlAudio(): HTMLAudioElement {
     const audio = new Audio();
     audio.loop = true;
     audio.volume = 0.5;
     audio.preload = 'none';
-    const canOgg = audio.canPlayType('audio/ogg') !== '';
-    audio.src = canOgg ? `${basePath}.ogg` : `${basePath}.mp3`;
     return audio;
   }
 
@@ -122,17 +120,35 @@ export class AudioManager {
 
   private doPlay(track: 'field' | 'boss') {
     const html = track === 'field' ? this.fieldHtml : this.bossHtml;
+    const base = `./audio/${track}`;
+    const gen  = this.generation;
 
-    // Try HTML Audio first (CLAUDE.md specified files)
-    html.play().then(() => {
-      this.currentHtml = html;
-    }).catch(() => {
-      // File not found or blocked → fall back to Web Audio API synthesis
-      this.currentHtml = null;
-      if (this.ctx && this.masterGain) {
-        this.synthLoop(track, this.generation);
-      }
-    });
+    const tryUrl = (url: string, next?: () => void) => {
+      if (gen !== this.generation) return;
+      html.src = url;
+      html.load();
+      html.play().then(() => {
+        if (gen !== this.generation) { html.pause(); return; }
+        this.currentHtml = html;
+      }).catch(() => {
+        if (gen !== this.generation) return;
+        next ? next() : this.fallbackToSynth(track, gen);
+      });
+    };
+
+    const canOgg = html.canPlayType('audio/ogg') !== '';
+    if (canOgg) {
+      tryUrl(`${base}.ogg`, () => tryUrl(`${base}.mp3`));
+    } else {
+      tryUrl(`${base}.mp3`);
+    }
+  }
+
+  private fallbackToSynth(track: 'field' | 'boss', gen: number) {
+    this.currentHtml = null;
+    if (this.ctx && this.masterGain && gen === this.generation) {
+      this.synthLoop(track, gen);
+    }
   }
 
   private synthLoop(track: 'field' | 'boss', gen: number) {
