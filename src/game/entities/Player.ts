@@ -1,12 +1,12 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { InputManager } from '../../input';
 import type { WorldMap } from '../maps/WorldMap';
 
 export class Player {
   x: number;
   y: number;
-  readonly w = 32;
-  readonly h = 32;
+  readonly w = 40;
+  readonly h = 40;
   speed = 180;
 
   hp: number;
@@ -25,9 +25,13 @@ export class Player {
   facingX = 1;
   facingY = 0;
 
-  readonly gfx: Graphics;
+  private sprite: Sprite;
   readonly attackGfx: Graphics;
+  readonly shadowGfx: Graphics;
   readonly container: Container;
+
+  // Bob animation
+  private bobTimer = 0;
 
   justLeveledUp = false;
 
@@ -35,11 +39,24 @@ export class Player {
     this.x = x;
     this.y = y;
     this.hp = this.maxHp;
-    this.gfx = new Graphics();
-    this.attackGfx = new Graphics();
+
     this.container = new Container();
+
+    // Drop shadow
+    this.shadowGfx = new Graphics();
+    this.container.addChild(this.shadowGfx);
+
+    // Attack effect layer (below sprite)
+    this.attackGfx = new Graphics();
     this.container.addChild(this.attackGfx);
-    this.container.addChild(this.gfx);
+
+    // Character sprite
+    this.sprite = new Sprite(Texture.from('./images/player.png'));
+    this.sprite.anchor.set(0.5);
+    this.sprite.width = this.w;
+    this.sprite.height = this.h;
+    this.container.addChild(this.sprite);
+
     this.render();
   }
 
@@ -58,16 +75,17 @@ export class Player {
     const spd = this.speed * (dashing ? this.dashSpeedMult : 1);
     const mx = input.moveX * spd * dt;
     const my = input.moveY * spd * dt;
+    const isMoving = input.moveX !== 0 || input.moveY !== 0;
 
-    if (input.moveX !== 0 || input.moveY !== 0) {
+    if (isMoving) {
       this.facingX = input.moveX;
       this.facingY = input.moveY;
-      // Normalize facing
       const len = Math.sqrt(this.facingX ** 2 + this.facingY ** 2);
       if (len > 0) {
         this.facingX /= len;
         this.facingY /= len;
       }
+      this.bobTimer += dt * (dashing ? 20 : 8);
     }
 
     if (!map.isColliding(this.x + mx, this.y, this.w, this.h)) this.x += mx;
@@ -122,35 +140,75 @@ export class Player {
 
   private render() {
     const flicker = this.invincibleTime > 0 && Math.floor(this.invincibleTime * 10) % 2 === 0;
-    const alpha = flicker ? 0.3 : 1;
     const dashing = this.dashTime > 0;
 
-    this.gfx.clear();
+    // Drop shadow
+    this.shadowGfx.clear();
+    this.shadowGfx.beginFill(0x000000, 0.3);
+    this.shadowGfx.drawEllipse(0, this.h / 2 - 4, this.w * 0.4, 5);
+    this.shadowGfx.endFill();
 
-    // Body
-    this.gfx.beginFill(dashing ? 0x88ccff : 0x4488ff, alpha);
-    this.gfx.drawRoundedRect(-this.w / 2, -this.h / 2, this.w, this.h, 6);
-    this.gfx.endFill();
+    // Sprite appearance
+    this.sprite.alpha = flicker ? 0.2 : 1.0;
 
-    // Direction indicator (eye)
-    this.gfx.beginFill(0xffffff, alpha);
-    this.gfx.drawCircle(this.facingX * 9, this.facingY * 9, 6);
-    this.gfx.endFill();
-    this.gfx.beginFill(0x001133, alpha);
-    this.gfx.drawCircle(this.facingX * 9 + this.facingX * 2, this.facingY * 9 + this.facingY * 2, 3);
-    this.gfx.endFill();
+    // Tint: blue when dashing, white when attacking, normal otherwise
+    if (dashing) {
+      this.sprite.tint = 0x88eeff;
+    } else if (this.attackDuration > 0) {
+      this.sprite.tint = 0xffee88;
+    } else {
+      this.sprite.tint = 0xffffff;
+    }
 
-    // Attack slash
+    // Flip sprite based on facing direction
+    this.sprite.scale.x = this.facingX < -0.3 ? -Math.abs(this.sprite.scale.x) : Math.abs(this.sprite.scale.x);
+
+    // Bob animation when moving
+    const bobY = Math.sin(this.bobTimer) * 2;
+    this.sprite.y = bobY;
+
+    // Dash speed lines
     this.attackGfx.clear();
+    if (dashing) {
+      // Speed lines behind player
+      for (let i = 0; i < 3; i++) {
+        const offset = (i - 1) * 8;
+        const perpX = -this.facingY;
+        const perpY = this.facingX;
+        const lx = -this.facingX * (10 + i * 6) + perpX * offset;
+        const ly = -this.facingY * (10 + i * 6) + perpY * offset;
+        const alpha = 0.6 - i * 0.15;
+        this.attackGfx.lineStyle(2, 0x88eeff, alpha);
+        this.attackGfx.moveTo(lx, ly);
+        this.attackGfx.lineTo(lx - this.facingX * 12, ly - this.facingY * 12);
+      }
+    }
+
+    // Attack slash arc
     if (this.attackDuration > 0) {
       const ax = this.facingX * this.attackRange * 0.6;
       const ay = this.facingY * this.attackRange * 0.6;
       const r = this.attackRange * 0.55;
-      this.attackGfx.beginFill(0xffee44, 0.6);
+      const progress = this.attackDuration / 0.14;
+
+      // Glow circle
+      this.attackGfx.beginFill(0xffee44, 0.35 * progress);
       this.attackGfx.drawCircle(ax, ay, r);
       this.attackGfx.endFill();
-      this.attackGfx.lineStyle(2, 0xffffff, 0.8);
-      this.attackGfx.drawCircle(ax, ay, r);
+
+      // Slash arc
+      this.attackGfx.lineStyle(3, 0xffffff, 0.9 * progress);
+      this.attackGfx.drawCircle(ax, ay, r * 0.7);
+
+      // Star burst
+      for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2 + this.bobTimer;
+        const sx = ax + Math.cos(angle) * r * 0.8;
+        const sy = ay + Math.sin(angle) * r * 0.8;
+        this.attackGfx.lineStyle(2, 0xffcc00, 0.7 * progress);
+        this.attackGfx.moveTo(ax, ay);
+        this.attackGfx.lineTo(sx, sy);
+      }
     }
   }
 }
