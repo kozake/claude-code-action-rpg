@@ -1,4 +1,4 @@
-import { Graphics, RenderTexture, Sprite, Container } from 'pixi.js';
+import { Graphics, RenderTexture, Sprite, Container, Texture } from 'pixi.js';
 import type { Renderer } from 'pixi.js';
 
 export const TILE_SIZE = 48;
@@ -12,17 +12,16 @@ export const TILE = {
 } as const;
 type TileType = (typeof TILE)[keyof typeof TILE];
 
-const TILE_COLORS: Record<TileType, number> = {
-  [TILE.GRASS]: 0x3d8b3d,
-  [TILE.WALL]: 0x445566,
-  [TILE.BOSS_FLOOR]: 0x2a1440,
-};
-
-const TILE_BORDER: Record<TileType, number> = {
-  [TILE.GRASS]: 0x2d6b2d,
-  [TILE.WALL]: 0x334455,
-  [TILE.BOSS_FLOOR]: 0x1a0a2a,
-};
+// Torch decoration positions [col, row] placed on walls near the field
+const TORCH_POSITIONS: [number, number][] = [
+  [8, 0], [20, 0], [32, 0], [44, 0],
+  [0, 6], [0, 14], [0, 22],
+  [49, 8], [49, 16], [49, 24],
+  [8, 28], [20, 28], [32, 28], [44, 28],
+  // Boss room torches
+  [8, 30], [20, 30], [32, 30], [44, 30],
+  [0, 33], [0, 37], [49, 33], [49, 37],
+];
 
 export class WorldMap {
   readonly data: TileType[][];
@@ -115,7 +114,16 @@ export class WorldMap {
   }
 
   private renderToTexture(renderer: Renderer) {
-    const gfx = new Graphics();
+    const floorTextures = [
+      Texture.from('./images/floor0.png'),
+      Texture.from('./images/floor1.png'),
+      Texture.from('./images/floor2.png'),
+    ];
+    const wallTex = Texture.from('./images/wall.png');
+    const bossTex = Texture.from('./images/boss_floor.png');
+    const torchTex = Texture.from('./images/torch.png');
+
+    const container = new Container();
 
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
@@ -123,37 +131,64 @@ export class WorldMap {
         const x = c * TILE_SIZE;
         const y = r * TILE_SIZE;
 
-        // Tile fill
-        gfx.beginFill(TILE_COLORS[tile]);
-        gfx.drawRect(x, y, TILE_SIZE, TILE_SIZE);
-        gfx.endFill();
+        let tex: Texture;
+        if (tile === TILE.WALL) {
+          tex = wallTex;
+        } else if (tile === TILE.BOSS_FLOOR) {
+          tex = bossTex;
+        } else {
+          // Deterministic floor variation based on position
+          const v = (r * 7 + c * 13 + r * c) % 3;
+          tex = floorTextures[v];
+        }
 
-        // Tile border (subtle)
-        gfx.beginFill(TILE_BORDER[tile]);
-        gfx.drawRect(x, y, TILE_SIZE, 1);
-        gfx.drawRect(x, y, 1, TILE_SIZE);
-        gfx.endFill();
+        const s = new Sprite(tex);
+        s.x = x;
+        s.y = y;
+        s.width = TILE_SIZE;
+        s.height = TILE_SIZE;
+        container.addChild(s);
+      }
+    }
+
+    // Torch decorations on walls
+    for (const [tc, tr] of TORCH_POSITIONS) {
+      if (tr < MAP_ROWS && tc < MAP_COLS) {
+        const ts = new Sprite(torchTex);
+        ts.anchor.set(0.5);
+        ts.x = tc * TILE_SIZE + TILE_SIZE / 2;
+        ts.y = tr * TILE_SIZE + TILE_SIZE / 2;
+        ts.width = TILE_SIZE * 0.7;
+        ts.height = TILE_SIZE * 0.7;
+        container.addChild(ts);
       }
     }
 
     // Door indicator (bright gap on dividing wall)
-    gfx.beginFill(0x88ff88, 0.4);
+    const gfx = new Graphics();
+    gfx.beginFill(0xaaff88, 0.5);
     gfx.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
     gfx.endFill();
 
-    // "BOSS ROOM" text hints (arrow decoration on door)
-    gfx.beginFill(0xffaa00);
+    // Arrow decoration on door
+    gfx.beginFill(0xffcc00);
     const doorCx = 24.5 * TILE_SIZE;
     const doorCy = 28.5 * TILE_SIZE;
     gfx.drawPolygon([
-      doorCx - 12, doorCy - 8,
-      doorCx + 12, doorCy - 8,
-      doorCx, doorCy + 8,
+      doorCx - 14, doorCy - 10,
+      doorCx + 14, doorCy - 10,
+      doorCx, doorCy + 10,
     ]);
     gfx.endFill();
 
+    // Boss room border glow
+    gfx.lineStyle(3, 0x660000, 0.6);
+    gfx.drawRect(TILE_SIZE, 30 * TILE_SIZE, (MAP_COLS - 2) * TILE_SIZE, (MAP_ROWS - 31) * TILE_SIZE);
+
+    container.addChild(gfx);
+
     const rt = RenderTexture.create({ width: this.pixelWidth, height: this.pixelHeight });
-    renderer.render(gfx, { renderTexture: rt });
+    renderer.render(container, { renderTexture: rt });
 
     const sprite = new Sprite(rt);
     this.container.addChild(sprite);

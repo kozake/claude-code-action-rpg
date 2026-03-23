@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js';
+import { Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Player } from './Player';
 import type { WorldMap } from '../maps/WorldMap';
 
@@ -17,10 +17,13 @@ export class Enemy {
   dead = false;
   hitFlash = 0;
 
-  readonly gfx: Graphics;
+  protected sprite: Sprite;
+  protected hpBarGfx: Graphics;
+  readonly shadowGfx: Graphics;
   readonly container: Container;
 
-  protected color: number;
+  // Float animation
+  protected floatTimer: number;
 
   constructor(
     x: number,
@@ -30,9 +33,9 @@ export class Enemy {
     damage = 10,
     attackRange = 36,
     xpReward = 20,
-    w = 28,
-    h = 28,
-    color = 0xcc3333,
+    w = 36,
+    h = 36,
+    spriteUrl = './images/enemy1.png',
   ) {
     this.x = x;
     this.y = y;
@@ -44,11 +47,25 @@ export class Enemy {
     this.xpReward = xpReward;
     this.w = w;
     this.h = h;
-    this.color = color;
+    this.floatTimer = Math.random() * Math.PI * 2; // random phase
 
-    this.gfx = new Graphics();
     this.container = new Container();
-    this.container.addChild(this.gfx);
+
+    // Drop shadow
+    this.shadowGfx = new Graphics();
+    this.container.addChild(this.shadowGfx);
+
+    // Character sprite
+    this.sprite = new Sprite(Texture.from(spriteUrl));
+    this.sprite.anchor.set(0.5);
+    this.sprite.width = w;
+    this.sprite.height = h;
+    this.container.addChild(this.sprite);
+
+    // HP bar on top
+    this.hpBarGfx = new Graphics();
+    this.container.addChild(this.hpBarGfx);
+
     this.render();
   }
 
@@ -57,6 +74,7 @@ export class Enemy {
 
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.floatTimer += dt * 2.5;
 
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -93,30 +111,43 @@ export class Enemy {
 
   protected render() {
     const hpRatio = this.hp / this.maxHp;
-    const fill = this.hitFlash > 0 ? 0xffffff : this.color;
 
-    this.gfx.clear();
-    this.gfx.beginFill(fill);
-    this.gfx.drawRoundedRect(-this.w / 2, -this.h / 2, this.w, this.h, 4);
-    this.gfx.endFill();
+    // Drop shadow
+    this.shadowGfx.clear();
+    this.shadowGfx.beginFill(0x000000, 0.3);
+    this.shadowGfx.drawEllipse(0, this.h / 2 - 4, this.w * 0.4, 5);
+    this.shadowGfx.endFill();
 
-    // Eye
-    this.gfx.beginFill(0xffff00);
-    this.gfx.drawCircle(-5, -3, 4);
-    this.gfx.drawCircle(5, -3, 4);
-    this.gfx.endFill();
-    this.gfx.beginFill(0x000000);
-    this.gfx.drawCircle(-5, -3, 2);
-    this.gfx.drawCircle(5, -3, 2);
-    this.gfx.endFill();
+    // Floating animation
+    const floatY = Math.sin(this.floatTimer) * 2;
+    this.sprite.y = floatY - 2;
+
+    // Hit flash: white tint, otherwise normal
+    if (this.hitFlash > 0) {
+      this.sprite.tint = 0xffffff;
+      this.sprite.alpha = 0.8;
+    } else {
+      this.sprite.tint = 0xffffff;
+      this.sprite.alpha = 1.0;
+    }
 
     // HP bar
-    this.gfx.beginFill(0x330000);
-    this.gfx.drawRect(-this.w / 2, -this.h / 2 - 10, this.w, 5);
-    this.gfx.endFill();
-    this.gfx.beginFill(hpRatio > 0.5 ? 0x44cc44 : hpRatio > 0.25 ? 0xffcc00 : 0xff3333);
-    this.gfx.drawRect(-this.w / 2, -this.h / 2 - 10, this.w * hpRatio, 5);
-    this.gfx.endFill();
+    this.hpBarGfx.clear();
+    if (hpRatio < 1) {
+      const bw = this.w + 4;
+      const bh = 5;
+      const bx = -bw / 2;
+      const by = -this.h / 2 - 12;
+      // Background
+      this.hpBarGfx.beginFill(0x220000);
+      this.hpBarGfx.drawRect(bx, by, bw, bh);
+      this.hpBarGfx.endFill();
+      // Fill
+      const fillColor = hpRatio > 0.5 ? 0x44dd44 : hpRatio > 0.25 ? 0xffcc00 : 0xff3333;
+      this.hpBarGfx.beginFill(fillColor);
+      this.hpBarGfx.drawRect(bx, by, bw * hpRatio, bh);
+      this.hpBarGfx.endFill();
+    }
   }
 }
 
@@ -128,8 +159,38 @@ export class Boss extends Enemy {
   wanderX = 0;
   wanderY = 0;
 
+  // Crown decoration
+  private crownGfx: Graphics;
+
   constructor(x: number, y: number) {
-    super(x, y, 600, 55, 25, 52, 300, 52, 52, 0x990033);
+    super(x, y, 600, 55, 25, 56, 300, 60, 60, './images/boss.png');
+    // Add crown graphic on top
+    this.crownGfx = new Graphics();
+    this.container.addChild(this.crownGfx);
+    this.drawCrown();
+  }
+
+  private drawCrown() {
+    const cw = 40;
+    const ch = 14;
+    const cx = -cw / 2;
+    const cy = -this.h / 2 - ch - 4;
+
+    this.crownGfx.clear();
+    this.crownGfx.beginFill(0xffcc00);
+    this.crownGfx.drawRect(cx, cy + 5, cw, ch - 5);
+    this.crownGfx.drawRect(cx, cy, 9, ch);
+    this.crownGfx.drawRect(cx + cw / 2 - 4, cy - 5, 9, ch + 5);
+    this.crownGfx.drawRect(cx + cw - 9, cy, 9, ch);
+    this.crownGfx.endFill();
+
+    // Jewels
+    this.crownGfx.beginFill(0xff2222);
+    this.crownGfx.drawCircle(cx + cw / 4, cy + 8, 3);
+    this.crownGfx.endFill();
+    this.crownGfx.beginFill(0x2222ff);
+    this.crownGfx.drawCircle(cx + cw * 3 / 4, cy + 8, 3);
+    this.crownGfx.endFill();
   }
 
   update(dt: number, player: Player, map: WorldMap) {
@@ -137,6 +198,7 @@ export class Boss extends Enemy {
 
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.floatTimer += dt * (this.isAngry ? 5 : 2);
 
     // Phase 2 at 50% HP
     if (!this.isAngry && this.hp < this.maxHp * 0.5) {
@@ -185,44 +247,54 @@ export class Boss extends Enemy {
 
   protected render() {
     const hpRatio = this.hp / this.maxHp;
-    const fill = this.hitFlash > 0 ? 0xffffff : (this.isAngry ? 0xcc0000 : 0x990033);
 
-    this.gfx.clear();
+    // Drop shadow (larger for boss)
+    this.shadowGfx.clear();
+    this.shadowGfx.beginFill(0x000000, 0.35);
+    this.shadowGfx.drawEllipse(0, this.h / 2 - 4, this.w * 0.5, 8);
+    this.shadowGfx.endFill();
 
-    // Body
-    this.gfx.beginFill(fill);
-    this.gfx.drawRoundedRect(-this.w / 2, -this.h / 2, this.w, this.h, 8);
-    this.gfx.endFill();
+    // Floating with intensity based on phase
+    const floatAmt = this.isAngry ? 4 : 2;
+    const floatY = Math.sin(this.floatTimer) * floatAmt;
+    this.sprite.y = floatY - 4;
 
-    // Crown
-    const cw = this.w * 0.7;
-    const ch = 12;
-    const cx = -cw / 2;
-    const cy = -this.h / 2 - ch;
-    this.gfx.beginFill(0xffcc00);
-    this.gfx.drawRect(cx, cy + 4, cw, ch - 4);
-    this.gfx.drawRect(cx, cy, 8, ch);
-    this.gfx.drawRect(cx + cw / 2 - 4, cy - 4, 8, ch + 4);
-    this.gfx.drawRect(cx + cw - 8, cy, 8, ch);
-    this.gfx.endFill();
+    // Phase 2: red tint on the boss sprite
+    if (this.hitFlash > 0) {
+      this.sprite.tint = 0xffffff;
+    } else if (this.isAngry) {
+      this.sprite.tint = 0xff6666;
+    } else {
+      this.sprite.tint = 0xffffff;
+    }
 
-    // Eyes (angry in phase 2)
-    const eyeColor = this.isAngry ? 0xff4400 : 0xff0000;
-    this.gfx.beginFill(eyeColor);
-    this.gfx.drawCircle(-10, -4, 7);
-    this.gfx.drawCircle(10, -4, 7);
-    this.gfx.endFill();
-    this.gfx.beginFill(0xffffff);
-    this.gfx.drawCircle(-10, -4, 3);
-    this.gfx.drawCircle(10, -4, 3);
-    this.gfx.endFill();
+    // Scale pulsing in phase 2
+    if (this.isAngry) {
+      const pulse = 1 + Math.sin(this.floatTimer * 2) * 0.05;
+      this.sprite.scale.x = pulse * (this.w / 16);
+      this.sprite.scale.y = pulse * (this.h / 16);
+    } else {
+      this.sprite.scale.set(this.w / 16);
+    }
+
+    // Crown follows float
+    if (this.crownGfx) this.crownGfx.y = this.sprite.y;
 
     // HP bar (thick)
-    this.gfx.beginFill(0x330000);
-    this.gfx.drawRect(-this.w / 2, -this.h / 2 - 22, this.w, 8);
-    this.gfx.endFill();
-    this.gfx.beginFill(hpRatio > 0.5 ? 0xff6600 : 0xff2222);
-    this.gfx.drawRect(-this.w / 2, -this.h / 2 - 22, this.w * hpRatio, 8);
-    this.gfx.endFill();
+    this.hpBarGfx.clear();
+    const bw = this.w + 16;
+    const bh = 8;
+    const bx = -bw / 2;
+    const by = -this.h / 2 - 24;
+    this.hpBarGfx.beginFill(0x330000);
+    this.hpBarGfx.drawRect(bx, by, bw, bh);
+    this.hpBarGfx.endFill();
+    const fillColor = hpRatio > 0.5 ? 0xff6600 : 0xff2222;
+    this.hpBarGfx.beginFill(fillColor);
+    this.hpBarGfx.drawRect(bx, by, bw * hpRatio, bh);
+    this.hpBarGfx.endFill();
+    // Border
+    this.hpBarGfx.lineStyle(1, 0xffffff, 0.4);
+    this.hpBarGfx.drawRect(bx, by, bw, bh);
   }
 }

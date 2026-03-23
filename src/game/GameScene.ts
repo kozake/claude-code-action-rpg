@@ -8,8 +8,16 @@ import { AttackButton } from '../ui/AttackButton';
 import { HUD } from '../ui/HUD';
 import { InputManager } from '../input';
 import { AudioManager } from '../audio';
+import { ParticleSystem } from './Particles';
 
 type GameState = 'title' | 'playing' | 'gameover' | 'win';
+
+// Enemy sprite rotation: alternate between different enemy sprites
+const ENEMY_SPRITES = [
+  './images/enemy1.png',
+  './images/enemy2.png',
+  './images/enemy3.png',
+];
 
 export class GameScene {
   readonly container: Container;
@@ -20,6 +28,7 @@ export class GameScene {
   private player: Player;
   private enemies: Enemy[];
   private boss: Boss;
+  private particles: ParticleSystem;
 
   private joystick: VirtualJoystick;
   private attackButton: AttackButton;
@@ -34,6 +43,10 @@ export class GameScene {
 
   private bossTriggered = false;
   private state: GameState = 'title';
+
+  // Screen shake
+  private shakeTime = 0;
+  private shakeIntensity = 0;
 
   // Title screen overlay
   private titleOverlay: Container;
@@ -57,7 +70,7 @@ export class GameScene {
     this.player = new Player(spawn.x, spawn.y);
     this.world.addChild(this.player.container);
 
-    // Enemies in the field area (avoid walls and edges)
+    // Enemies in the field area (alternate sprite types)
     const enemyDefs: [number, number, number, number][] = [
       // [tileCol, tileRow, hp, speed]
       [14, 5, 50, 75],
@@ -73,8 +86,14 @@ export class GameScene {
       [30, 10, 50, 85],
       [13, 26, 55, 70],
     ];
-    this.enemies = enemyDefs.map(([tc, tr, hp, spd]) => {
-      const e = new Enemy(tc * TILE_SIZE + TILE_SIZE / 2, tr * TILE_SIZE + TILE_SIZE / 2, hp, spd);
+    this.enemies = enemyDefs.map(([tc, tr, hp, spd], i) => {
+      const spriteUrl = ENEMY_SPRITES[i % ENEMY_SPRITES.length];
+      const e = new Enemy(
+        tc * TILE_SIZE + TILE_SIZE / 2,
+        tr * TILE_SIZE + TILE_SIZE / 2,
+        hp, spd, 10, 36, 20, 36, 36,
+        spriteUrl,
+      );
       this.world.addChild(e.container);
       return e;
     });
@@ -82,6 +101,10 @@ export class GameScene {
     // Boss
     this.boss = new Boss(TILE_SIZE * 25, TILE_SIZE * 35);
     this.world.addChild(this.boss.container);
+
+    // Particle system
+    this.particles = new ParticleSystem();
+    this.world.addChild(this.particles.container);
 
     // UI
     this.joystick = new VirtualJoystick(this.screenW, this.screenH);
@@ -117,7 +140,7 @@ export class GameScene {
     const overlay = new Container();
 
     const bg = new Graphics();
-    bg.beginFill(0x000000, 0.75);
+    bg.beginFill(0x000000, 0.78);
     bg.drawRect(0, 0, this.screenW, this.screenH);
     bg.endFill();
     overlay.addChild(bg);
@@ -151,41 +174,68 @@ export class GameScene {
     return overlay;
   }
 
+  /** Trigger a brief screen shake */
+  private shake(intensity: number, duration = 0.25) {
+    this.shakeIntensity = intensity;
+    this.shakeTime = duration;
+  }
+
   update(delta: number) {
     const dt = delta / 60;
 
     if (this.state === 'title') return;
-    if (this.state === 'gameover' || this.state === 'win') {
-      // Tap to restart
-      return;
-    }
+    if (this.state === 'gameover' || this.state === 'win') return;
 
     this.input.update();
 
     // Player update
+    const wasInvincible = this.player.invincibleTime > 0;
     this.player.update(dt, this.input, this.map);
+
+    // Screen shake when player takes damage
+    const tookDamage = !wasInvincible && this.player.invincibleTime > 0;
+    if (tookDamage) {
+      this.shake(8, 0.3);
+      this.particles.emitHit(this.player.x, this.player.y);
+    }
 
     // Check player attack hits
     const hitbox = this.player.getAttackHitbox();
     if (hitbox) {
       for (const enemy of this.enemies) {
         if (!enemy.dead && this.circleHit(hitbox, enemy)) {
+          const wasDead = enemy.dead;
           enemy.takeDamage(this.player.attackDamage);
-          if (enemy.dead) this.player.addXp(enemy.xpReward);
+          if (!wasDead) {
+            this.particles.emitHit(hitbox.cx, hitbox.cy);
+            this.particles.showDamage(enemy.x, enemy.y, this.player.attackDamage, false);
+            if (enemy.dead) {
+              this.particles.emitDeath(enemy.x, enemy.y, 0x44cc44);
+              this.player.addXp(enemy.xpReward);
+            }
+          }
         }
       }
       if (!this.boss.dead && this.circleHit(hitbox, this.boss)) {
         const wasPh2 = this.boss.isAngry;
+        const wasDeadBoss = this.boss.dead;
         this.boss.takeDamage(this.player.attackDamage);
-        if (!wasPh2 && this.boss.isAngry) {
-          // Phase 2 flash
-          this.hud.triggerFlash(0xff0000, 0.8);
-          this.hud.showMessage('⚠ PHASE 2 ⚠', 2);
-        }
-        if (this.boss.dead) {
-          this.state = 'win';
-          this.audio.stop();
-          this.hud.showMessage('🎉 YOU WIN!\nボスを倒した！\n\nリロードして再プレイ', 9999);
+        if (!wasDeadBoss) {
+          this.particles.emitHit(hitbox.cx, hitbox.cy);
+          this.particles.showDamage(this.boss.x, this.boss.y, this.player.attackDamage, true);
+          if (!wasPh2 && this.boss.isAngry) {
+            this.shake(15, 0.5);
+            this.particles.emitBossRage(this.boss.x, this.boss.y);
+            this.hud.triggerFlash(0xff0000, 0.8);
+            this.hud.showMessage('⚠ PHASE 2 ⚠', 2);
+          }
+          if (this.boss.dead) {
+            this.particles.emitDeath(this.boss.x, this.boss.y, 0x9900aa);
+            this.particles.emitDeath(this.boss.x, this.boss.y, 0xff4400);
+            this.state = 'win';
+            this.audio.stop();
+            this.hud.showMessage('🎉 YOU WIN!\nボスを倒した！\n\nリロードして再プレイ', 9999);
+          }
         }
       }
     }
@@ -193,6 +243,7 @@ export class GameScene {
     // Level up message
     if (this.player.justLeveledUp) {
       this.player.justLeveledUp = false;
+      this.particles.showLevelUp(this.player.x, this.player.y - 20);
       this.hud.showMessage(`✨ LEVEL UP! Lv.${this.player.level}`, 2);
     }
 
@@ -211,6 +262,7 @@ export class GameScene {
     if (!this.bossTriggered && playerRow >= this.map.bossRowStart) {
       this.bossTriggered = true;
       this.audio.playBoss();
+      this.shake(10, 0.4);
       this.hud.triggerFlash(0x440000, 0.6);
       this.hud.showMessage('⚠ BOSS ROOM ⚠', 3);
     }
@@ -227,8 +279,11 @@ export class GameScene {
       this.hud.showMessage('💀 GAME OVER\n\nリロードして再プレイ', 9999);
     }
 
-    // Camera
-    this.updateCamera();
+    // Camera with shake
+    this.updateCamera(dt);
+
+    // Update particles (pass camera position for container offset)
+    this.particles.update(dt, this.cameraX, this.cameraY);
 
     // HUD
     this.hud.update(
@@ -249,15 +304,26 @@ export class GameScene {
     return dx * dx + dy * dy <= hb.r * hb.r;
   }
 
-  private updateCamera() {
+  private updateCamera(dt: number) {
     const targetX = this.player.x - this.screenW / 2;
     const targetY = this.player.y - this.screenH / 2;
     const maxX = this.map.pixelWidth - this.screenW;
     const maxY = this.map.pixelHeight - this.screenH;
     this.cameraX = Math.max(0, Math.min(maxX, targetX));
     this.cameraY = Math.max(0, Math.min(maxY, targetY));
-    this.world.x = -this.cameraX;
-    this.world.y = -this.cameraY;
+
+    // Apply screen shake
+    let shakeOffX = 0;
+    let shakeOffY = 0;
+    if (this.shakeTime > 0) {
+      this.shakeTime -= dt;
+      const intensity = this.shakeIntensity * (this.shakeTime / 0.25);
+      shakeOffX = (Math.random() - 0.5) * intensity * 2;
+      shakeOffY = (Math.random() - 0.5) * intensity * 2;
+    }
+
+    this.world.x = -this.cameraX + shakeOffX;
+    this.world.y = -this.cameraY + shakeOffY;
   }
 
   onResize(w: number, h: number) {
@@ -271,7 +337,7 @@ export class GameScene {
     if (this.titleOverlay.children[0] instanceof Graphics) {
       const bg = this.titleOverlay.children[0] as Graphics;
       bg.clear();
-      bg.beginFill(0x000000, 0.75);
+      bg.beginFill(0x000000, 0.78);
       bg.drawRect(0, 0, w, h);
       bg.endFill();
     }
