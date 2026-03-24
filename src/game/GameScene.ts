@@ -2,13 +2,14 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { Application } from 'pixi.js';
 import { WorldMap, TILE_SIZE } from './maps/WorldMap';
 import { Player } from './entities/Player';
-import { Enemy, Boss } from './entities/Enemy';
+import { Enemy, RangedEnemy, Boss } from './entities/Enemy';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
 import { AttackButton } from '../ui/AttackButton';
 import { HUD } from '../ui/HUD';
 import { InputManager } from '../input';
 import { AudioManager } from '../audio';
 import { ParticleSystem } from './Particles';
+import { ProjectileSystem } from './Projectile';
 
 type GameState = 'title' | 'playing' | 'gameover' | 'win';
 
@@ -29,6 +30,7 @@ export class GameScene {
   private enemies: Enemy[];
   private boss: Boss;
   private particles: ParticleSystem;
+  private projectiles: ProjectileSystem;
 
   private joystick: VirtualJoystick;
   private attackButton: AttackButton;
@@ -70,30 +72,31 @@ export class GameScene {
     this.player = new Player(spawn.x, spawn.y);
     this.world.addChild(this.player.container);
 
-    // Enemies in the field area (alternate sprite types)
-    const enemyDefs: [number, number, number, number][] = [
-      // [tileCol, tileRow, hp, speed]
-      [14, 5, 50, 75],
-      [22, 8, 55, 80],
-      [9, 14, 45, 70],
-      [34, 4, 60, 85],
-      [38, 13, 50, 80],
-      [27, 17, 65, 70],
-      [18, 22, 55, 90],
-      [42, 7, 45, 75],
-      [7, 20, 70, 65],
-      [46, 18, 60, 80],
-      [30, 10, 50, 85],
-      [13, 26, 55, 70],
+    // -----------------------------------------------------------------------
+    // Enemies in the field area
+    // Format: [tileCol, tileRow, hp, speed, isRanged]
+    // -----------------------------------------------------------------------
+    const enemyDefs: [number, number, number, number, boolean][] = [
+      [14,  5,  110, 80,  false],
+      [22,  8,  120, 85,  true ],   // ranged
+      [9,  14,  100, 75,  false],
+      [34,  4,  130, 90,  false],
+      [38, 13,  115, 85,  true ],   // ranged
+      [27, 17,  140, 75,  false],
+      [18, 22,  120, 95,  false],
+      [42,  7,  100, 80,  true ],   // ranged
+      [7,  20,  150, 70,  false],
+      [46, 18,  130, 85,  false],
+      [30, 10,  110, 90,  true ],   // ranged
+      [13, 26,  120, 75,  false],
     ];
-    this.enemies = enemyDefs.map(([tc, tr, hp, spd], i) => {
+    this.enemies = enemyDefs.map(([tc, tr, hp, spd, ranged], i) => {
       const spriteUrl = ENEMY_SPRITES[i % ENEMY_SPRITES.length];
-      const e = new Enemy(
-        tc * TILE_SIZE + TILE_SIZE / 2,
-        tr * TILE_SIZE + TILE_SIZE / 2,
-        hp, spd, 10, 36, 20, 36, 36,
-        spriteUrl,
-      );
+      const px = tc * TILE_SIZE + TILE_SIZE / 2;
+      const py = tr * TILE_SIZE + TILE_SIZE / 2;
+      const e = ranged
+        ? new RangedEnemy(px, py, hp, spd, 14, 30, spriteUrl)
+        : new Enemy(px, py, hp, spd, 20, 38, 20, 36, 36, spriteUrl);
       this.world.addChild(e.container);
       return e;
     });
@@ -105,6 +108,10 @@ export class GameScene {
     // Particle system
     this.particles = new ParticleSystem();
     this.world.addChild(this.particles.container);
+
+    // Projectile system (enemy bullets)
+    this.projectiles = new ProjectileSystem();
+    this.world.addChild(this.projectiles.container);
 
     // UI
     this.joystick = new VirtualJoystick(this.screenW, this.screenH);
@@ -180,6 +187,17 @@ export class GameScene {
     this.shakeTime = duration;
   }
 
+  /** Fire callback passed to enemies/boss */
+  private readonly fireFn = (
+    x: number, y: number,
+    vx: number, vy: number,
+    dmg: number,
+    color?: number,
+    radius?: number,
+  ) => {
+    this.projectiles.add(x, y, vx, vy, dmg, color, radius);
+  };
+
   update(delta: number) {
     const dt = delta / 60;
 
@@ -192,7 +210,7 @@ export class GameScene {
     const wasInvincible = this.player.invincibleTime > 0;
     this.player.update(dt, this.input, this.map);
 
-    // Screen shake when player takes damage
+    // Screen shake when player takes damage (melee)
     const tookDamage = !wasInvincible && this.player.invincibleTime > 0;
     if (tookDamage) {
       this.shake(8, 0.3);
@@ -218,6 +236,7 @@ export class GameScene {
       }
       if (!this.boss.dead && this.circleHit(hitbox, this.boss)) {
         const wasPh2 = this.boss.isAngry;
+        const wasPh3 = this.boss.isEnraged;
         const wasDeadBoss = this.boss.dead;
         this.boss.takeDamage(this.player.attackDamage);
         if (!wasDeadBoss) {
@@ -227,9 +246,17 @@ export class GameScene {
             this.shake(15, 0.5);
             this.particles.emitBossRage(this.boss.x, this.boss.y);
             this.hud.triggerFlash(0xff0000, 0.8);
-            this.hud.showMessage('⚠ PHASE 2 ⚠', 2);
+            this.hud.showMessage('⚠ PHASE 2 ⚠\n速度・ダメージ増加！', 2.5);
+          }
+          if (!wasPh3 && this.boss.isEnraged) {
+            this.shake(20, 0.7);
+            this.particles.emitBossRage(this.boss.x, this.boss.y);
+            this.particles.emitBossRage(this.boss.x, this.boss.y);
+            this.hud.triggerFlash(0xaa00ff, 1.0);
+            this.hud.showMessage('💀 PHASE 3 💀\n弾幕・全力全開！', 3);
           }
           if (this.boss.dead) {
+            this.projectiles.clear();
             this.particles.emitDeath(this.boss.x, this.boss.y, 0x9900aa);
             this.particles.emitDeath(this.boss.x, this.boss.y, 0xff4400);
             this.state = 'win';
@@ -247,14 +274,25 @@ export class GameScene {
       this.hud.showMessage(`✨ LEVEL UP! Lv.${this.player.level}`, 2);
     }
 
-    // Enemy updates
+    // Enemy updates (pass fire callback)
     for (const enemy of this.enemies) {
-      enemy.update(dt, this.player, this.map);
+      enemy.update(dt, this.player, this.map, this.fireFn);
     }
 
     // Boss
     if (!this.boss.dead) {
-      this.boss.update(dt, this.player, this.map);
+      this.boss.update(dt, this.player, this.map, this.fireFn);
+    }
+
+    // Projectile update + player hit check
+    this.projectiles.update(dt);
+    const projHit = this.projectiles.checkHitPlayer(this.player);
+    if (projHit) {
+      const wasInv = this.player.invincibleTime > (1.2 - 0.01); // freshly hit
+      if (!wasInv) {
+        this.shake(6, 0.25);
+        this.particles.emitHit(this.player.x, this.player.y);
+      }
     }
 
     // Check boss room entry
