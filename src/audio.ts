@@ -7,23 +7,33 @@
 
 type NoteEvent = { freq: number; beats: number; vol: number; type: OscillatorType };
 
-// Field BGM fallback: C major, peaceful exploration, 100 BPM
-const FIELD_BPM = 100;
+// Field BGM fallback: D major, adventurous exploration, 140 BPM
+const FIELD_BPM = 140;
 const FIELD_MELODY: NoteEvent[] = [
-  { freq: 261.63, beats: 1, vol: 0.28, type: 'sine' },  // C4
-  { freq: 329.63, beats: 1, vol: 0.24, type: 'sine' },  // E4
-  { freq: 392.00, beats: 1, vol: 0.24, type: 'sine' },  // G4
-  { freq: 440.00, beats: 1, vol: 0.28, type: 'sine' },  // A4
-  { freq: 392.00, beats: 1, vol: 0.24, type: 'sine' },  // G4
-  { freq: 329.63, beats: 1, vol: 0.24, type: 'sine' },  // E4
-  { freq: 293.66, beats: 1, vol: 0.22, type: 'sine' },  // D4
-  { freq: 261.63, beats: 1, vol: 0.28, type: 'sine' },  // C4
+  { freq: 293.66, beats: 0.5, vol: 0.30, type: 'square' },  // D4
+  { freq: 369.99, beats: 0.5, vol: 0.26, type: 'square' },  // F#4
+  { freq: 440.00, beats: 1,   vol: 0.30, type: 'square' },  // A4
+  { freq: 493.88, beats: 0.5, vol: 0.28, type: 'square' },  // B4
+  { freq: 440.00, beats: 0.5, vol: 0.26, type: 'square' },  // A4
+  { freq: 369.99, beats: 0.5, vol: 0.26, type: 'square' },  // F#4
+  { freq: 329.63, beats: 0.5, vol: 0.28, type: 'square' },  // E4
+  { freq: 293.66, beats: 0.5, vol: 0.30, type: 'square' },  // D4
+  { freq: 329.63, beats: 0.5, vol: 0.26, type: 'square' },  // E4
+  { freq: 369.99, beats: 0.5, vol: 0.26, type: 'square' },  // F#4
+  { freq: 440.00, beats: 0.5, vol: 0.30, type: 'square' },  // A4
+  { freq: 369.99, beats: 0.5, vol: 0.26, type: 'square' },  // F#4
+  { freq: 329.63, beats: 1,   vol: 0.28, type: 'square' },  // E4
+  { freq: 293.66, beats: 1,   vol: 0.30, type: 'square' },  // D4
 ];
 const FIELD_BASS: NoteEvent[] = [
-  { freq: 65.41,  beats: 2, vol: 0.18, type: 'triangle' }, // C2
-  { freq: 98.00,  beats: 2, vol: 0.14, type: 'triangle' }, // G2
-  { freq: 87.31,  beats: 2, vol: 0.14, type: 'triangle' }, // F2
-  { freq: 98.00,  beats: 2, vol: 0.14, type: 'triangle' }, // G2
+  { freq: 73.42,  beats: 1, vol: 0.20, type: 'triangle' }, // D2
+  { freq: 73.42,  beats: 1, vol: 0.16, type: 'triangle' }, // D2
+  { freq: 55.00,  beats: 1, vol: 0.18, type: 'triangle' }, // A1
+  { freq: 55.00,  beats: 1, vol: 0.14, type: 'triangle' }, // A1
+  { freq: 61.74,  beats: 1, vol: 0.18, type: 'triangle' }, // B1
+  { freq: 61.74,  beats: 1, vol: 0.14, type: 'triangle' }, // B1
+  { freq: 55.00,  beats: 1, vol: 0.18, type: 'triangle' }, // A1
+  { freq: 65.41,  beats: 1, vol: 0.16, type: 'triangle' }, // C2
 ];
 
 // Boss BGM fallback: D minor, intense battle, 160 BPM
