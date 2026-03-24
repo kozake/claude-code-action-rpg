@@ -66,6 +66,9 @@ export class AudioManager {
   private currentTrack: 'field' | 'boss' | null = null;
   private generation = 0;
 
+  // Track whether boss audio has been pre-loaded/unlocked
+  private bossReady = false;
+
   constructor() {
     this.fieldHtml = this.createHtmlAudio();
     this.bossHtml  = this.createHtmlAudio();
@@ -77,6 +80,14 @@ export class AudioManager {
     audio.volume = 0.5;
     audio.preload = 'none';
     return audio;
+  }
+
+  /** Determine the best audio URL for a track */
+  private getAudioUrl(track: 'field' | 'boss'): string {
+    const base = `./audio/${track}`;
+    const testEl = this.fieldHtml;
+    const canOgg = testEl.canPlayType('audio/ogg') !== '';
+    return canOgg ? `${base}.ogg` : `${base}.mp3`;
   }
 
   // Call on first user gesture to unlock audio context
@@ -94,8 +105,43 @@ export class AudioManager {
     }
     this.started = true;
 
+    // Pre-load and unlock boss audio during user gesture (field will be played immediately)
+    this.preloadBossAudio();
+
     if (this.currentTrack === 'field') this.doPlay('field');
     else if (this.currentTrack === 'boss') this.doPlay('boss');
+  }
+
+  /** Pre-load boss audio element and unlock it for later playback (must be called from user gesture) */
+  private preloadBossAudio() {
+    const html = this.bossHtml;
+    const url = this.getAudioUrl('boss');
+    html.src = url;
+    html.load();
+    // Brief play+pause to unlock audio on mobile browsers
+    const p = html.play();
+    if (p) {
+      p.then(() => {
+        html.pause();
+        html.currentTime = 0;
+        this.bossReady = true;
+      }).catch(() => {
+        // File might not exist or format unsupported; try fallback format
+        const altUrl = url.endsWith('.ogg')
+          ? './audio/boss.mp3'
+          : './audio/boss.ogg';
+        html.src = altUrl;
+        html.load();
+        const p2 = html.play();
+        if (p2) {
+          p2.then(() => {
+            html.pause();
+            html.currentTime = 0;
+            this.bossReady = true;
+          }).catch(() => { /* will use synth fallback */ });
+        }
+      });
+    }
   }
 
   playField() {
@@ -130,19 +176,59 @@ export class AudioManager {
 
   private doPlay(track: 'field' | 'boss') {
     const html = track === 'field' ? this.fieldHtml : this.bossHtml;
-    const base = `./audio/${track}`;
+    const ready = track === 'boss' ? this.bossReady : false;
     const gen  = this.generation;
+
+    // If audio was pre-loaded and unlocked, just play it directly
+    if (ready && html.src) {
+      html.currentTime = 0;
+      const p = html.play();
+      if (p) {
+        p.then(() => {
+          if (gen !== this.generation) { html.pause(); return; }
+          this.currentHtml = html;
+        }).catch(() => {
+          if (gen !== this.generation) return;
+          this.fallbackToSynth(track, gen);
+        });
+      }
+      return;
+    }
+
+    // Fallback: try loading and playing (for cases where preload didn't work)
+    const base = `./audio/${track}`;
 
     const tryUrl = (url: string, next?: () => void) => {
       if (gen !== this.generation) return;
       html.src = url;
       html.load();
+      // Wait for enough data before playing
+      const onReady = () => {
+        html.removeEventListener('canplaythrough', onReady);
+        if (gen !== this.generation) return;
+        html.play().then(() => {
+          if (gen !== this.generation) { html.pause(); return; }
+          this.currentHtml = html;
+        }).catch(() => {
+          if (gen !== this.generation) return;
+          next ? next() : this.fallbackToSynth(track, gen);
+        });
+      };
+      html.addEventListener('canplaythrough', onReady);
+      // Also try playing immediately in case it's already loaded
       html.play().then(() => {
+        html.removeEventListener('canplaythrough', onReady);
         if (gen !== this.generation) { html.pause(); return; }
         this.currentHtml = html;
       }).catch(() => {
-        if (gen !== this.generation) return;
-        next ? next() : this.fallbackToSynth(track, gen);
+        // Wait for canplaythrough event, or timeout to synth
+        setTimeout(() => {
+          html.removeEventListener('canplaythrough', onReady);
+          if (gen !== this.generation) return;
+          if (!this.currentHtml || this.currentHtml !== html) {
+            next ? next() : this.fallbackToSynth(track, gen);
+          }
+        }, 3000);
       });
     };
 
