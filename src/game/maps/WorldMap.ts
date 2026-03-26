@@ -32,10 +32,45 @@ export class WorldMap {
   // Boss room entry row
   readonly bossRowStart = 30;
 
+  // Whether the boss room door is locked (player cannot exit during boss fight)
+  bossRoomLocked = false;
+  private doorBarrier: Graphics;
+
   constructor(renderer: Renderer) {
     this.data = this.buildMap();
     this.container = new Container();
     this.renderToTexture(renderer);
+
+    // Barrier overlay drawn on top of rendered texture (hidden by default)
+    this.doorBarrier = new Graphics();
+    this.container.addChild(this.doorBarrier);
+  }
+
+  /** Close the boss room door with a red barrier. */
+  lockBossRoom() {
+    this.bossRoomLocked = true;
+    const g = this.doorBarrier;
+    g.clear();
+    g.beginFill(0xcc0000, 0.75);
+    g.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
+    g.endFill();
+    // Cross-hatch lines for visual "sealed" effect
+    g.lineStyle(3, 0xff4444, 0.9);
+    for (let i = 0; i <= 3; i++) {
+      const x = (23 + i) * TILE_SIZE;
+      g.moveTo(x, 29 * TILE_SIZE);
+      g.lineTo(x + TILE_SIZE, (29 + 1) * TILE_SIZE);
+      g.moveTo(x + TILE_SIZE, 29 * TILE_SIZE);
+      g.lineTo(x, (29 + 1) * TILE_SIZE);
+    }
+    g.lineStyle(2, 0xff8800, 1);
+    g.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
+  }
+
+  /** Open the boss room door after the boss is defeated. */
+  unlockBossRoom() {
+    this.bossRoomLocked = false;
+    this.doorBarrier.clear();
   }
 
   private buildMap(): TileType[][] {
@@ -207,6 +242,8 @@ export class WorldMap {
       const tr = Math.floor(py / TILE_SIZE);
       if (tc < 0 || tr < 0 || tc >= MAP_COLS || tr >= MAP_ROWS) return true;
       if (this.data[tr][tc] === TILE.WALL) return true;
+      // Treat the door gap as a wall when the boss room is locked
+      if (this.bossRoomLocked && tr === 29 && tc >= 23 && tc <= 25) return true;
     }
     return false;
   }

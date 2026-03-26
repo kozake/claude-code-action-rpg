@@ -117,6 +117,7 @@ export class AudioManager {
     const html = this.bossHtml;
     const url = this.getAudioUrl('boss');
     html.src = url;
+    html.volume = 0; // mute during preload so boss BGM doesn't leak
     html.load();
     // Brief play+pause to unlock audio on mobile browsers
     const p = html.play();
@@ -124,8 +125,10 @@ export class AudioManager {
       p.then(() => {
         html.pause();
         html.currentTime = 0;
+        html.volume = 0.5; // restore volume for actual playback
         this.bossReady = true;
       }).catch(() => {
+        html.volume = 0.5;
         // File might not exist or format unsupported; try fallback format
         const altUrl = url.endsWith('.ogg')
           ? './audio/boss.mp3'
