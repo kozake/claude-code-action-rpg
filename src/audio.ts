@@ -123,12 +123,15 @@ export class AudioManager {
     const p = html.play();
     if (p) {
       p.then(() => {
-        html.pause();
-        html.currentTime = 0;
+        // Only pause if boss track is not actively playing (race condition guard)
+        if (this.currentTrack !== 'boss') {
+          html.pause();
+          html.currentTime = 0;
+        }
         html.volume = 0.5; // restore volume for actual playback
         this.bossReady = true;
       }).catch(() => {
-        html.volume = 0.5;
+        // Keep muted during retry (do NOT set volume to 0.5 here)
         // File might not exist or format unsupported; try fallback format
         const altUrl = url.endsWith('.ogg')
           ? './audio/boss.mp3'
@@ -138,8 +141,12 @@ export class AudioManager {
         const p2 = html.play();
         if (p2) {
           p2.then(() => {
-            html.pause();
-            html.currentTime = 0;
+            // Only pause if boss track is not actively playing (race condition guard)
+            if (this.currentTrack !== 'boss') {
+              html.pause();
+              html.currentTime = 0;
+            }
+            html.volume = 0.5;
             this.bossReady = true;
           }).catch(() => { /* will use synth fallback */ });
         }
