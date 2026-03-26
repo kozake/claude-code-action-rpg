@@ -101,8 +101,9 @@ export class GameScene {
       return e;
     });
 
-    // Boss
+    // Boss – hidden until player enters the boss room
     this.boss = new Boss(TILE_SIZE * 25, TILE_SIZE * 35);
+    this.boss.container.visible = false;
     this.world.addChild(this.boss.container);
 
     // Particle system
@@ -234,7 +235,7 @@ export class GameScene {
           }
         }
       }
-      if (!this.boss.dead && this.circleHit(hitbox, this.boss)) {
+      if (!this.boss.dead && this.bossTriggered && this.circleHit(hitbox, this.boss)) {
         const wasPh2 = this.boss.isAngry;
         const wasPh3 = this.boss.isEnraged;
         const wasDeadBoss = this.boss.dead;
@@ -259,6 +260,7 @@ export class GameScene {
             this.projectiles.clear();
             this.particles.emitDeath(this.boss.x, this.boss.y, 0x9900aa);
             this.particles.emitDeath(this.boss.x, this.boss.y, 0xff4400);
+            this.map.unlockBossRoom();
             this.state = 'win';
             this.audio.stop();
             this.hud.showMessage('🎉 YOU WIN!\nボスを倒した！\n\nリロードして再プレイ', 9999);
@@ -279,8 +281,8 @@ export class GameScene {
       enemy.update(dt, this.player, this.map, this.fireFn);
     }
 
-    // Boss
-    if (!this.boss.dead) {
+    // Boss (only active after boss room is entered)
+    if (!this.boss.dead && this.bossTriggered) {
       this.boss.update(dt, this.player, this.map, this.fireFn);
     }
 
@@ -300,14 +302,11 @@ export class GameScene {
     if (!this.bossTriggered && playerRow >= this.map.bossRowStart) {
       this.bossTriggered = true;
       this.audio.playBoss();
-      this.shake(10, 0.4);
-      this.hud.triggerFlash(0x440000, 0.6);
-      this.hud.showMessage('⚠ BOSS ROOM ⚠', 3);
-    }
-    // Return to field music if player goes back
-    if (this.bossTriggered && playerRow < this.map.bossRowStart && !this.boss.dead) {
-      this.bossTriggered = false;
-      this.audio.playField();
+      this.shake(15, 0.5);
+      this.hud.triggerFlash(0x440000, 0.8);
+      this.hud.showMessage('⚠ BOSS ROOM ⚠\n扉が閉じた…', 3);
+      this.map.lockBossRoom();
+      this.boss.container.visible = true;
     }
 
     // Game over
