@@ -13,7 +13,7 @@ export class ChargerEnemy extends Enemy {
   private chargeSpeed = 450;
 
   constructor(x: number, y: number, hp = 140, speed = 70) {
-    super(x, y, hp, speed, 25, 40, 30, 40, 40);
+    super(x, y, hp, speed, 50, 40, 30, 40, 40);
     this.telegraphGfx = new Graphics();
     this.container.addChild(this.telegraphGfx);
   }
@@ -135,12 +135,12 @@ export class BomberEnemy extends Enemy {
   private bombTimer = 0;
   private readonly fuseTime = 2.0;
   private readonly explosionRadius = 90;
-  private readonly explosionDamage = 35;
+  private readonly explosionDamage = 70;
   private tickGfx: Graphics;
   exploded = false;
 
   constructor(x: number, y: number, hp = 80, speed = 90) {
-    super(x, y, hp, speed, 10, 50, 25, 32, 32);
+    super(x, y, hp, speed, 20, 50, 25, 32, 32);
     this.tickGfx = new Graphics();
     this.container.addChild(this.tickGfx);
   }
@@ -272,7 +272,7 @@ export class ShieldEnemy extends Enemy {
   private shieldGfx: Graphics;
 
   constructor(x: number, y: number, hp = 180, speed = 55) {
-    super(x, y, hp, speed, 22, 36, 35, 38, 38);
+    super(x, y, hp, speed, 44, 36, 35, 38, 38);
     this.shieldGfx = new Graphics();
     this.container.addChild(this.shieldGfx);
   }
@@ -362,7 +362,7 @@ export class SummonerEnemy extends Enemy {
   pendingSummon = false;
 
   constructor(x: number, y: number, hp = 200, speed = 40) {
-    super(x, y, hp, speed, 15, 36, 50, 40, 40);
+    super(x, y, hp, speed, 30, 36, 50, 40, 40);
     this.summonTimer = 2;
   }
 
