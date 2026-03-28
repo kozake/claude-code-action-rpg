@@ -70,6 +70,7 @@ export class GameScene {
 
   // Boss entrance
   private bossEntranceTimer = 0;
+  private footstepTimer = 0;
 
   // Slow motion for boss kill
   private slowMoTime = 0;
@@ -154,7 +155,7 @@ export class GameScene {
       this.state = 'playing';
       this.titleOverlay.visible = false;
       this.audio.unlock();
-      this.audio.playField();
+      this.audio.playFloor(0);
       this.startFloorWave(0);
     };
     window.addEventListener('touchstart', startGame, { once: true });
@@ -316,6 +317,7 @@ export class GameScene {
           // Boss floor: trigger boss immediately
           this.triggerBoss();
         } else {
+          this.audio.playFloor(this.currentFloor);
           this.startFloorWave(0);
         }
       },
@@ -395,7 +397,7 @@ export class GameScene {
     // Trap damage
     const trapDmg = this.map.checkTrap(this.player.x, this.player.y, dt);
     if (trapDmg > 0) {
-      this.player.takeDamage(trapDmg);
+      this.player.takeDamage(trapDmg, this.player.x, this.player.y + 10);
       this.particles.emitHit(this.player.x, this.player.y);
       this.particles.showDamage(this.player.x, this.player.y, trapDmg, false);
     }
@@ -499,7 +501,7 @@ export class GameScene {
 
     // Wave completion check
     if (this.waveActive) {
-      const allDead = this.enemies.every(e => e.dead);
+      const allDead = this.enemies.every(e => e.fullyDead);
       if (allDead) {
         this.waveActive = false;
         this.waveDelay = 1.5;
@@ -559,6 +561,7 @@ export class GameScene {
       setTimeout(() => {
         this.state = 'win';
         this.audio.stop();
+        this.audio.playSfxVictory();
         this.hud.showMessage(
           `🎉 YOU WIN!\nボスを倒した！\n\nLv.${this.player.level}  コンボ最大: ${this.player.comboCount}\n\nリロードして再プレイ`,
           9999,
@@ -570,7 +573,28 @@ export class GameScene {
     if (this.player.dead) {
       this.state = 'gameover';
       this.audio.stop();
+      this.audio.playSfxGameOver();
       this.hud.showMessage('💀 GAME OVER\n\nリロードして再プレイ', 9999);
+    }
+
+    // Footstep particles
+    const isMoving = this.input.moveX !== 0 || this.input.moveY !== 0;
+    if (isMoving && !this.player.isDashing) {
+      this.footstepTimer += dt;
+      if (this.footstepTimer > 0.15) {
+        this.footstepTimer -= 0.15;
+        this.particles.emitFootstep(this.player.x, this.player.y);
+      }
+    } else {
+      this.footstepTimer = 0;
+    }
+
+    // Ambient environment particles
+    const floorCfg = this.floorConfigs[this.currentFloor];
+    if (floorCfg) {
+      const sw = this.app.screen.width;
+      const sh = this.app.screen.height;
+      this.particles.emitAmbient(dt, floorCfg.theme.name, this.cameraX + sw / 2, this.cameraY + sh / 2, sw, sh);
     }
 
     // Camera

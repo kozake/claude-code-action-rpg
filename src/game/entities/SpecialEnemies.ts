@@ -63,7 +63,7 @@ export class ChargerEnemy extends Enemy {
       } else {
         this.x += mx; this.y += my;
         if (dist < this.attackRange) {
-          player.takeDamage(this.damage * 1.5);
+          player.takeDamage(this.damage * 1.5, this.x, this.y);
         }
       }
       if (this.chargeTimer <= 0) this.chargeState = 'idle';
@@ -189,7 +189,7 @@ export class BomberEnemy extends Enemy {
     const dy = player.y - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < this.explosionRadius) {
-      player.takeDamage(this.explosionDamage);
+      player.takeDamage(this.explosionDamage, this.x, this.y);
     }
     this.dead = true;
     this.container.visible = false;
@@ -297,7 +297,7 @@ export class ShieldEnemy extends Enemy {
       if (!map.isColliding(this.x, this.y + my, this.w, this.h)) this.y += my;
     }
     if (dist < this.attackRange && this.attackCooldown <= 0) {
-      player.takeDamage(this.damage);
+      player.takeDamage(this.damage, this.x, this.y);
       this.attackCooldown = 1.8;
     }
     this.syncGfx();
@@ -397,7 +397,7 @@ export class SummonerEnemy extends Enemy {
     }
 
     if (dist < this.attackRange && this.attackCooldown <= 0) {
-      player.takeDamage(this.damage);
+      player.takeDamage(this.damage, this.x, this.y);
       this.attackCooldown = 2;
     }
     this.syncGfx();

@@ -71,7 +71,7 @@ export class ProjectileSystem {
       const dx = player.x - p.x, dy = player.y - p.y;
       const hitR = p.radius + player.w * 0.3;
       if (dx * dx + dy * dy < hitR * hitR) {
-        player.takeDamage(p.damage);
+        player.takeDamage(p.damage, p.x, p.y);
         this.container.removeChild(p.gfx); this.list.splice(i, 1);
         hit = true;
       }

@@ -33,6 +33,10 @@ export class Player {
   facingX = 1;
   facingY = 0;
 
+  // Knockback
+  kbVx = 0;
+  kbVy = 0;
+
   // Skill stats
   skills: SkillStats;
   acquiredSkillIds = new Set<string>();
@@ -57,6 +61,8 @@ export class Player {
 
   // Bob animation
   private bobTimer = 0;
+  // Idle animation
+  private idleTimer = 0;
 
   // Attack cooldown multiplier (from skills)
   attackCooldownMult = 1;
@@ -168,10 +174,23 @@ export class Player {
         this.facingY /= len;
       }
       this.bobTimer += dt * (dashing ? 20 : 8);
+      this.idleTimer = 0;
+    } else {
+      this.idleTimer += dt;
     }
 
     if (!map.isColliding(this.x + mx, this.y, this.w, this.h)) this.x += mx;
     if (!map.isColliding(this.x, this.y + my, this.w, this.h)) this.y += my;
+
+    // Knockback
+    if (Math.abs(this.kbVx) > 1 || Math.abs(this.kbVy) > 1) {
+      const kx = this.kbVx * dt;
+      const ky = this.kbVy * dt;
+      if (!map.isColliding(this.x + kx, this.y, this.w, this.h)) this.x += kx;
+      if (!map.isColliding(this.x, this.y + ky, this.w, this.h)) this.y += ky;
+      this.kbVx *= (1 - dt * 10);
+      this.kbVy *= (1 - dt * 10);
+    }
 
     // Attack
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
@@ -231,12 +250,20 @@ export class Player {
     this.comboTimer = this.comboWindow;
   }
 
-  takeDamage(amount: number) {
+  takeDamage(amount: number, fromX?: number, fromY?: number) {
     if (this.invincibleTime > 0) return;
     this.hp = Math.max(0, this.hp - amount);
     this.invincibleTime = 1.2;
     this.comboCount = 0;
     this.comboTimer = 0;
+    // Knockback away from damage source
+    if (fromX !== undefined && fromY !== undefined) {
+      const dx = this.x - fromX;
+      const dy = this.y - fromY;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      this.kbVx = (dx / dist) * 250;
+      this.kbVy = (dy / dist) * 250;
+    }
   }
 
   /** Heal HP (from vampiric or items) */
@@ -280,8 +307,14 @@ export class Player {
 
     // Flicker when invincible
     this.bodyGfx.alpha = flicker ? 0.2 : 1.0;
-    // Bob animation
-    this.bodyGfx.y = Math.sin(this.bobTimer) * 2;
+    // Bob animation (moving) / Idle breathing (standing still)
+    if (this.idleTimer > 0) {
+      this.bodyGfx.y = Math.sin(this.idleTimer * 2) * 1.5;
+      this.bodyGfx.scale.y = 1 + Math.sin(this.idleTimer * 2) * 0.015;
+    } else {
+      this.bodyGfx.y = Math.sin(this.bobTimer) * 2;
+      this.bodyGfx.scale.y = 1;
+    }
 
     // Choose color scheme based on state
     let bodyColor = 0x1a4bc0;      // Royal blue armor
@@ -301,84 +334,198 @@ export class Player {
 
     this.bodyGfx.clear();
 
-    // Flip horizontally based on facing direction
-    this.bodyGfx.scale.x = this.facingX < -0.3 ? -1 : 1;
+    const g = this.bodyGfx;
+    const cloakColor = (bodyColor & 0xfefefe) >> 1;
 
-    // ── Body ──────────────────────────────────────────────────────────────────
-    // Cape/cloak (behind body, darker)
-    const cloakColor = (bodyColor & 0xfefefe) >> 1; // ~50% darkened
-    this.bodyGfx.beginFill(cloakColor, 0.85);
-    this.bodyGfx.drawEllipse(0, 6, 13, 16);
-    this.bodyGfx.endFill();
+    // Determine facing direction: up, down, or side
+    const facingUp = this.facingY < -0.5;
+    const facingDown = this.facingY > 0.5;
+    // For side view, flip based on facingX
+    g.scale.x = this.facingX < -0.3 ? -1 : 1;
 
-    // Shoulder pauldrons
-    this.bodyGfx.beginFill(bodyColor);
-    this.bodyGfx.drawEllipse(-13, -2, 6, 5);
-    this.bodyGfx.drawEllipse(13, -2, 6, 5);
-    this.bodyGfx.endFill();
+    if (facingUp) {
+      // ── BACK VIEW (facing up / away) ─────────────────────────────────
+      // Cape (prominent, full back)
+      g.beginFill(cloakColor, 0.9);
+      g.drawEllipse(0, 4, 14, 17);
+      g.endFill();
+      // Cape detail lines
+      g.beginFill(cloakColor & 0x7f7f7f, 0.3);
+      g.drawRect(-1, -4, 2, 18);
+      g.endFill();
 
-    // Chest plate
-    this.bodyGfx.beginFill(bodyColor);
-    this.bodyGfx.drawRoundedRect(-10, -5, 20, 20, 5);
-    this.bodyGfx.endFill();
+      // Back plate (narrower, behind cape)
+      g.beginFill(bodyColor);
+      g.drawRoundedRect(-9, -4, 18, 18, 5);
+      g.endFill();
 
-    // Chest sheen (left highlight)
-    this.bodyGfx.beginFill(sheen, 0.4);
-    this.bodyGfx.drawRoundedRect(-9, -4, 8, 14, 4);
-    this.bodyGfx.endFill();
+      // Shoulder pauldrons
+      g.beginFill(bodyColor);
+      g.drawEllipse(-12, -2, 6, 5);
+      g.drawEllipse(12, -2, 6, 5);
+      g.endFill();
+      g.beginFill(sheen, 0.3);
+      g.drawEllipse(-12, -3, 4, 3);
+      g.drawEllipse(12, -3, 4, 3);
+      g.endFill();
 
-    // Emblem on chest
-    this.bodyGfx.beginFill(accentColor, 0.7);
-    this.bodyGfx.drawPolygon([0, -2, 3, 2, 0, 6, -3, 2]);
-    this.bodyGfx.endFill();
+      // Belt
+      g.beginFill(0x221100, 0.6);
+      g.drawRect(-10, 11, 20, 4);
+      g.endFill();
 
-    // Belt
-    this.bodyGfx.beginFill(0x221100, 0.6);
-    this.bodyGfx.drawRect(-10, 11, 20, 4);
-    this.bodyGfx.endFill();
-    this.bodyGfx.beginFill(glowColor, 0.3);
-    this.bodyGfx.drawRect(-3, 11, 6, 4);
-    this.bodyGfx.endFill();
+      // Helmet back (no visor)
+      g.beginFill(bodyColor);
+      g.drawCircle(0, -17, 10);
+      g.endFill();
+      // Helmet back sheen
+      g.beginFill(sheen, 0.25);
+      g.drawCircle(-2, -20, 5);
+      g.endFill();
 
-    // ── Head / Helmet ─────────────────────────────────────────────────────────
-    // Helmet base
-    this.bodyGfx.beginFill(bodyColor);
-    this.bodyGfx.drawCircle(0, -17, 10);
-    this.bodyGfx.endFill();
+      // Crest ridge
+      g.beginFill(accentColor, 0.8);
+      g.drawRoundedRect(-2, -28, 4, 12, 2);
+      g.endFill();
+      g.beginFill(glowColor, 0.5);
+      g.drawRoundedRect(-1, -28, 2, 8, 1);
+      g.endFill();
+    } else if (facingDown) {
+      // ── FRONT VIEW (facing down / toward camera) ─────────────────────
+      // Cape behind body
+      g.beginFill(cloakColor, 0.85);
+      g.drawEllipse(0, 6, 13, 16);
+      g.endFill();
 
-    // Crest ridge on top
-    this.bodyGfx.beginFill(accentColor, 0.8);
-    this.bodyGfx.drawRoundedRect(-2, -28, 4, 12, 2);
-    this.bodyGfx.endFill();
-    this.bodyGfx.beginFill(glowColor, 0.5);
-    this.bodyGfx.drawRoundedRect(-1, -28, 2, 8, 1);
-    this.bodyGfx.endFill();
+      // Shoulder pauldrons
+      g.beginFill(bodyColor);
+      g.drawEllipse(-13, -2, 6, 5);
+      g.drawEllipse(13, -2, 6, 5);
+      g.endFill();
 
-    // Visor slit
-    this.bodyGfx.beginFill(0x001122, 0.75);
-    this.bodyGfx.drawRoundedRect(-8, -20, 16, 5, 2);
-    this.bodyGfx.endFill();
+      // Chest plate
+      g.beginFill(bodyColor);
+      g.drawRoundedRect(-10, -5, 20, 20, 5);
+      g.endFill();
+      g.beginFill(sheen, 0.4);
+      g.drawRoundedRect(-9, -4, 8, 14, 4);
+      g.endFill();
 
-    // Glowing eyes through visor
-    this.bodyGfx.beginFill(glowColor, 0.4);
-    this.bodyGfx.drawCircle(-4, -19, 3.5);
-    this.bodyGfx.drawCircle(4, -19, 3.5);
-    this.bodyGfx.endFill();
-    this.bodyGfx.beginFill(glowColor);
-    this.bodyGfx.drawCircle(-4, -19, 2);
-    this.bodyGfx.drawCircle(4, -19, 2);
-    this.bodyGfx.endFill();
-    // Eye highlight
-    this.bodyGfx.beginFill(0xffffff, 0.7);
-    this.bodyGfx.drawCircle(-3.5, -19.5, 0.7);
-    this.bodyGfx.drawCircle(4.5, -19.5, 0.7);
-    this.bodyGfx.endFill();
+      // Emblem
+      g.beginFill(accentColor, 0.7);
+      g.drawPolygon([0, -2, 3, 2, 0, 6, -3, 2]);
+      g.endFill();
 
-    // Cheek guards
-    this.bodyGfx.beginFill(bodyColor);
-    this.bodyGfx.drawRoundedRect(-10, -22, 3, 8, 2);
-    this.bodyGfx.drawRoundedRect(7, -22, 3, 8, 2);
-    this.bodyGfx.endFill();
+      // Belt
+      g.beginFill(0x221100, 0.6);
+      g.drawRect(-10, 11, 20, 4);
+      g.endFill();
+      g.beginFill(glowColor, 0.3);
+      g.drawRect(-3, 11, 6, 4);
+      g.endFill();
+
+      // Helmet
+      g.beginFill(bodyColor);
+      g.drawCircle(0, -17, 10);
+      g.endFill();
+
+      // Crest
+      g.beginFill(accentColor, 0.8);
+      g.drawRoundedRect(-2, -28, 4, 12, 2);
+      g.endFill();
+      g.beginFill(glowColor, 0.5);
+      g.drawRoundedRect(-1, -28, 2, 8, 1);
+      g.endFill();
+
+      // Visor
+      g.beginFill(0x001122, 0.75);
+      g.drawRoundedRect(-8, -20, 16, 5, 2);
+      g.endFill();
+
+      // Glowing eyes
+      g.beginFill(glowColor, 0.4);
+      g.drawCircle(-4, -19, 3.5);
+      g.drawCircle(4, -19, 3.5);
+      g.endFill();
+      g.beginFill(glowColor);
+      g.drawCircle(-4, -19, 2);
+      g.drawCircle(4, -19, 2);
+      g.endFill();
+      g.beginFill(0xffffff, 0.7);
+      g.drawCircle(-3.5, -19.5, 0.7);
+      g.drawCircle(4.5, -19.5, 0.7);
+      g.endFill();
+
+      // Cheek guards
+      g.beginFill(bodyColor);
+      g.drawRoundedRect(-10, -22, 3, 8, 2);
+      g.drawRoundedRect(7, -22, 3, 8, 2);
+      g.endFill();
+    } else {
+      // ── SIDE VIEW (facing left/right) ────────────────────────────────
+      // Cape trailing behind (always drawn on -x side due to scale flip)
+      g.beginFill(cloakColor, 0.85);
+      g.drawEllipse(-4, 5, 11, 16);
+      g.endFill();
+
+      // Body (slightly turned)
+      g.beginFill(bodyColor);
+      g.drawRoundedRect(-8, -5, 18, 20, 5);
+      g.endFill();
+      g.beginFill(sheen, 0.35);
+      g.drawRoundedRect(2, -4, 6, 14, 4);
+      g.endFill();
+
+      // Front shoulder (larger, closer)
+      g.beginFill(bodyColor);
+      g.drawEllipse(10, -2, 6, 5);
+      g.endFill();
+      g.beginFill(sheen, 0.3);
+      g.drawEllipse(10, -3, 4, 3);
+      g.endFill();
+
+      // Belt
+      g.beginFill(0x221100, 0.6);
+      g.drawRect(-8, 11, 18, 4);
+      g.endFill();
+      g.beginFill(glowColor, 0.3);
+      g.drawRect(1, 11, 5, 4);
+      g.endFill();
+
+      // Helmet (side view)
+      g.beginFill(bodyColor);
+      g.drawCircle(0, -17, 10);
+      g.endFill();
+
+      // Crest
+      g.beginFill(accentColor, 0.8);
+      g.drawRoundedRect(-2, -28, 4, 12, 2);
+      g.endFill();
+      g.beginFill(glowColor, 0.5);
+      g.drawRoundedRect(-1, -28, 2, 8, 1);
+      g.endFill();
+
+      // Visor (narrower, side angle)
+      g.beginFill(0x001122, 0.75);
+      g.drawRoundedRect(-3, -20, 12, 5, 2);
+      g.endFill();
+
+      // Single eye (side view)
+      g.beginFill(glowColor, 0.4);
+      g.drawCircle(4, -19, 3.5);
+      g.endFill();
+      g.beginFill(glowColor);
+      g.drawCircle(4, -19, 2);
+      g.endFill();
+      g.beginFill(0xffffff, 0.7);
+      g.drawCircle(4.5, -19.5, 0.7);
+      g.endFill();
+
+      // Cheek guard (one side)
+      g.beginFill(bodyColor);
+      g.drawRoundedRect(7, -22, 3, 8, 2);
+      g.endFill();
+    }
 
     // ── Sword ─────────────────────────────────────────────────────────────────
     // Drawn in world-facing direction (unaffected by bodyGfx scale flip)

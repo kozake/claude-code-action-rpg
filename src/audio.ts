@@ -55,6 +55,77 @@ const BOSS_BASS: NoteEvent[] = [
   { freq: 65.41,  beats: 2, vol: 0.18, type: 'sawtooth' }, // C2
 ];
 
+// Floor-specific BGM variations (synth fallback)
+// Each floor has a unique key, tempo, and feel
+interface FloorBgm { bpm: number; melody: NoteEvent[]; bass: NoteEvent[] }
+
+const FLOOR_BGMS: FloorBgm[] = [
+  // B1F: Stone Labyrinth — D major, adventurous (same as field)
+  { bpm: FIELD_BPM, melody: FIELD_MELODY, bass: FIELD_BASS },
+
+  // B2F: Fire Cavern — E minor, tense, 150 BPM
+  { bpm: 150, melody: [
+    { freq: 329.63, beats: 0.5, vol: 0.32, type: 'sawtooth' },  // E4
+    { freq: 392.00, beats: 0.5, vol: 0.28, type: 'sawtooth' },  // G4
+    { freq: 440.00, beats: 0.5, vol: 0.32, type: 'sawtooth' },  // A4
+    { freq: 493.88, beats: 1,   vol: 0.35, type: 'sawtooth' },  // B4
+    { freq: 440.00, beats: 0.5, vol: 0.30, type: 'sawtooth' },  // A4
+    { freq: 392.00, beats: 0.5, vol: 0.28, type: 'sawtooth' },  // G4
+    { freq: 369.99, beats: 0.5, vol: 0.30, type: 'sawtooth' },  // F#4
+    { freq: 329.63, beats: 0.5, vol: 0.32, type: 'sawtooth' },  // E4
+    { freq: 293.66, beats: 1,   vol: 0.30, type: 'sawtooth' },  // D4
+    { freq: 329.63, beats: 0.5, vol: 0.32, type: 'sawtooth' },  // E4
+    { freq: 392.00, beats: 1,   vol: 0.28, type: 'sawtooth' },  // G4
+    { freq: 329.63, beats: 0.5, vol: 0.30, type: 'sawtooth' },  // E4
+  ], bass: [
+    { freq: 82.41,  beats: 1, vol: 0.22, type: 'sawtooth' },  // E2
+    { freq: 82.41,  beats: 1, vol: 0.18, type: 'sawtooth' },  // E2
+    { freq: 73.42,  beats: 1, vol: 0.20, type: 'sawtooth' },  // D2
+    { freq: 73.42,  beats: 1, vol: 0.16, type: 'sawtooth' },  // D2
+    { freq: 55.00,  beats: 1, vol: 0.20, type: 'sawtooth' },  // A1
+    { freq: 61.74,  beats: 1, vol: 0.18, type: 'sawtooth' },  // B1
+    { freq: 73.42,  beats: 1, vol: 0.20, type: 'sawtooth' },  // D2
+    { freq: 82.41,  beats: 1, vol: 0.18, type: 'sawtooth' },  // E2
+  ]},
+
+  // B3F: Ice Crypt — F# minor, slow and eerie, 120 BPM
+  { bpm: 120, melody: [
+    { freq: 369.99, beats: 1,   vol: 0.26, type: 'sine' },    // F#4
+    { freq: 440.00, beats: 0.5, vol: 0.22, type: 'sine' },    // A4
+    { freq: 415.30, beats: 0.5, vol: 0.24, type: 'sine' },    // G#4
+    { freq: 369.99, beats: 1,   vol: 0.26, type: 'sine' },    // F#4
+    { freq: 329.63, beats: 1,   vol: 0.24, type: 'sine' },    // E4
+    { freq: 293.66, beats: 0.5, vol: 0.22, type: 'sine' },    // D4
+    { freq: 329.63, beats: 0.5, vol: 0.22, type: 'sine' },    // E4
+    { freq: 369.99, beats: 2,   vol: 0.26, type: 'sine' },    // F#4 (held)
+  ], bass: [
+    { freq: 92.50,  beats: 2, vol: 0.16, type: 'triangle' },  // F#2
+    { freq: 82.41,  beats: 2, vol: 0.14, type: 'triangle' },  // E2
+    { freq: 73.42,  beats: 2, vol: 0.14, type: 'triangle' },  // D2
+    { freq: 82.41,  beats: 2, vol: 0.14, type: 'triangle' },  // E2
+  ]},
+
+  // B4F: Shadow Depths — C minor, heavy and ominous, 130 BPM
+  { bpm: 130, melody: [
+    { freq: 261.63, beats: 0.5, vol: 0.32, type: 'square' },  // C4
+    { freq: 311.13, beats: 0.5, vol: 0.28, type: 'square' },  // Eb4
+    { freq: 349.23, beats: 1,   vol: 0.32, type: 'square' },  // F4
+    { freq: 392.00, beats: 0.5, vol: 0.35, type: 'square' },  // G4
+    { freq: 349.23, beats: 0.5, vol: 0.30, type: 'square' },  // F4
+    { freq: 311.13, beats: 0.5, vol: 0.28, type: 'square' },  // Eb4
+    { freq: 261.63, beats: 1,   vol: 0.32, type: 'square' },  // C4
+    { freq: 233.08, beats: 0.5, vol: 0.30, type: 'square' },  // Bb3
+    { freq: 261.63, beats: 0.5, vol: 0.32, type: 'square' },  // C4
+    { freq: 311.13, beats: 1,   vol: 0.30, type: 'square' },  // Eb4
+    { freq: 261.63, beats: 1,   vol: 0.32, type: 'square' },  // C4
+  ], bass: [
+    { freq: 65.41,  beats: 2, vol: 0.24, type: 'sawtooth' },  // C2
+    { freq: 58.27,  beats: 2, vol: 0.20, type: 'sawtooth' },  // Bb1
+    { freq: 51.91,  beats: 2, vol: 0.22, type: 'sawtooth' },  // Ab1
+    { freq: 58.27,  beats: 2, vol: 0.20, type: 'sawtooth' },  // Bb1
+  ]},
+];
+
 export class AudioManager {
   private fieldHtml: HTMLAudioElement;
   private bossHtml: HTMLAudioElement;
@@ -66,6 +137,7 @@ export class AudioManager {
   private started = false;
   private currentTrack: 'field' | 'boss' | null = null;
   private generation = 0;
+  private currentFloorIndex = 0;
 
   // Track whether boss audio has been pre-loaded/unlocked
   private bossReady = false;
@@ -174,6 +246,27 @@ export class AudioManager {
     if (this.started) this.doPlay('boss');
   }
 
+  /** Play floor-specific BGM. Uses field audio file but with floor-specific synth fallback. */
+  playFloor(floorIndex: number) {
+    this.currentFloorIndex = floorIndex;
+    // Boss floor uses boss BGM
+    if (floorIndex >= FLOOR_BGMS.length) {
+      this.playBoss();
+      return;
+    }
+    // Force restart if floor changed (even if track type is 'field')
+    if (this.currentTrack === 'field' && this.currentFloorIndex !== floorIndex) {
+      this.pauseHtml();
+      this.generation++;
+    }
+    this.currentFloorIndex = floorIndex;
+    if (this.currentTrack === 'field') return;
+    this.pauseHtml();
+    this.generation++;
+    this.currentTrack = 'field';
+    if (this.started) this.doPlay('field');
+  }
+
   stop() {
     this.pauseHtml();
     this.generation++;
@@ -264,9 +357,13 @@ export class AudioManager {
   private synthLoop(track: 'field' | 'boss', gen: number) {
     if (gen !== this.generation || !this.ctx || !this.masterGain) return;
 
-    const bpm    = track === 'field' ? FIELD_BPM : BOSS_BPM;
-    const melody = track === 'field' ? FIELD_MELODY : BOSS_MELODY;
-    const bass   = track === 'field' ? FIELD_BASS : BOSS_BASS;
+    let bpm: number, melody: NoteEvent[], bass: NoteEvent[];
+    if (track === 'boss') {
+      bpm = BOSS_BPM; melody = BOSS_MELODY; bass = BOSS_BASS;
+    } else {
+      const floorBgm = FLOOR_BGMS[this.currentFloorIndex] || FLOOR_BGMS[0];
+      bpm = floorBgm.bpm; melody = floorBgm.melody; bass = floorBgm.bass;
+    }
     const beatSec = 60 / bpm;
     const startTime = this.ctx.currentTime + 0.05;
 
@@ -514,5 +611,62 @@ export class AudioManager {
   playSfxDash() {
     if (!this.ctx || !this.sfxGain) return;
     this.playNoise(0.08, 0.2, 800, 200, 'sawtooth');
+  }
+
+  /** Victory fanfare — ascending C major arpeggio */
+  playSfxVictory() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const notes = [523, 659, 784, 1047, 1319, 1568]; // C5 E5 G5 C6 E6 G6
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = notes[i];
+      const start = t + i * 0.1;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.25, start + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    }
+    // Final chord
+    for (const freq of [1047, 1319, 1568]) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = t + 0.6;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.2, start + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, start + 0.8);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.8);
+    }
+  }
+
+  /** Game over — descending minor phrase */
+  playSfxGameOver() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const notes = [392, 349.23, 311.13, 261.63]; // G4 F4 Eb4 C4
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = notes[i];
+      const start = t + i * 0.15;
+      env.gain.setValueAtTime(0, start);
+      env.gain.linearRampToValueAtTime(0.3, start + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.4);
+    }
   }
 }

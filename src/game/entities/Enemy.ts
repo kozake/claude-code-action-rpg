@@ -19,6 +19,11 @@ export class Enemy {
   dead = false;
   hitFlash = 0;
 
+  // Spawn / death animation
+  spawnTimer = 0.4;
+  deathTimer = 0;
+  get fullyDead() { return this.dead && this.deathTimer <= 0; }
+
   // Knockback
   kbVx = 0;
   kbVy = 0;
@@ -100,7 +105,29 @@ export class Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap, _fire?: FireFn) {
-    if (this.dead) return;
+    if (this.dead) {
+      if (this.deathTimer > 0) {
+        this.deathTimer -= dt;
+        const t = this.deathTimer / 0.3;
+        this.container.alpha = t;
+        this.container.scale.set(0.3 + t * 0.7);
+        this.container.rotation += dt * 8;
+        if (this.deathTimer <= 0) this.container.visible = false;
+      }
+      return;
+    }
+    // Spawn animation
+    if (this.spawnTimer > 0) {
+      this.spawnTimer -= dt;
+      const t = Math.max(0, this.spawnTimer / 0.4);
+      this.container.alpha = 1 - t;
+      this.container.scale.set(0.3 + (1 - t) * 0.7);
+      this.syncGfx();
+      return;
+    }
+    this.container.alpha = 1;
+    this.container.scale.set(1);
+    this.container.rotation = 0;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.floatTimer += dt * 2.5;
@@ -118,7 +145,7 @@ export class Enemy {
       if (!map.isColliding(this.x, this.y + my, this.w, this.h)) this.y += my;
     }
     if (dist < this.attackRange && this.attackCooldown <= 0) {
-      player.takeDamage(this.damage);
+      player.takeDamage(this.damage, this.x, this.y);
       this.attackCooldown = 1.5;
     }
     this.syncGfx();
@@ -133,7 +160,7 @@ export class Enemy {
   takeDamage(amount: number) {
     this.hp -= amount;
     this.hitFlash = 0.15;
-    if (this.hp <= 0) { this.hp = 0; this.dead = true; this.container.visible = false; }
+    if (this.hp <= 0) { this.hp = 0; this.dead = true; this.deathTimer = 0.3; }
   }
 
   /** Draw the enemy body. Subclasses override to customize appearance. */
