@@ -25,7 +25,7 @@ export class RangedEnemy extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap, fire?: FireFn) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.shootCooldown = Math.max(0, this.shootCooldown - dt);

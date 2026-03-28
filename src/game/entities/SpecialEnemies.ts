@@ -19,7 +19,7 @@ export class ChargerEnemy extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.floatTimer += dt * 3;
     const hitWall = this.updateKnockback(dt, map);
@@ -146,7 +146,7 @@ export class BomberEnemy extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.floatTimer += dt * 4;
     this.updateKnockback(dt, map);
@@ -278,7 +278,7 @@ export class ShieldEnemy extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.floatTimer += dt * 2;
@@ -367,7 +367,7 @@ export class SummonerEnemy extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.floatTimer += dt * 2;
