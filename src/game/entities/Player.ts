@@ -1,15 +1,11 @@
-import { Graphics, Container, Sprite, Texture } from 'pixi.js';
+import { Graphics, Container } from 'pixi.js';
 import type { InputManager } from '../../input';
 import type { WorldMap } from '../maps/WorldMap';
 import type { SkillStats } from '../Skills';
 
 /** Afterimage entry for dash trail */
 interface Afterimage {
-  x: number;
-  y: number;
-  scaleX: number;
-  alpha: number;
-  gfx: Sprite;
+  gfx: Graphics;
   life: number;
 }
 
@@ -44,13 +40,13 @@ export class Player {
   // Combo
   comboCount = 0;
   comboTimer = 0;
-  readonly comboWindow = 2.0; // seconds to keep combo alive
+  readonly comboWindow = 2.0;
 
   // Fire spin (skill)
   fireSpinActive = false;
   fireSpinTimer = 0;
 
-  private sprite: Sprite;
+  private bodyGfx: Graphics;
   readonly attackGfx: Graphics;
   readonly shadowGfx: Graphics;
   readonly container: Container;
@@ -68,7 +64,7 @@ export class Player {
   justLeveledUp = false;
 
   // Buff timers
-  crystalBuffTime = 0; // temporary damage boost
+  crystalBuffTime = 0;
 
   constructor(x: number, y: number, skillStats: SkillStats) {
     this.x = x;
@@ -82,16 +78,13 @@ export class Player {
     this.shadowGfx = new Graphics();
     this.container.addChild(this.shadowGfx);
 
-    // Attack effect layer (below sprite)
+    // Attack effect layer (below body)
     this.attackGfx = new Graphics();
     this.container.addChild(this.attackGfx);
 
-    // Character sprite
-    this.sprite = new Sprite(Texture.from('./images/player.png'));
-    this.sprite.anchor.set(0.5);
-    this.sprite.width = this.w;
-    this.sprite.height = this.h;
-    this.container.addChild(this.sprite);
+    // Character body (procedural)
+    this.bodyGfx = new Graphics();
+    this.container.addChild(this.bodyGfx);
 
     this.render();
   }
@@ -111,19 +104,15 @@ export class Player {
   /** Get effective attack damage (with combo multiplier, crit, crystal buff) */
   getEffectiveDamage(): { damage: number; isCrit: boolean } {
     let dmg = this.attackDamage;
-    // Combo multiplier: up to 2x at 10+ combo
     const comboMult = 1 + Math.min(this.comboCount * 0.1, 1.0);
     dmg *= comboMult;
-    // Crystal buff
     if (this.crystalBuffTime > 0) dmg *= 1.5;
-    // Crit
     const isCrit = Math.random() < this.skills.critChance;
     if (isCrit) dmg *= this.skills.critMult;
     return { damage: Math.round(dmg), isCrit };
   }
 
   update(dt: number, input: InputManager, map: WorldMap) {
-    // Timers
     this.comboTimer = Math.max(0, this.comboTimer - dt);
     if (this.comboTimer <= 0) this.comboCount = 0;
     this.crystalBuffTime = Math.max(0, this.crystalBuffTime - dt);
@@ -133,7 +122,6 @@ export class Player {
     // Dash
     this.dashCooldown = Math.max(0, this.dashCooldown - dt);
     if (input.skillPressed && this.dashCooldown <= 0 && this.dashTime <= 0) {
-      // Check if fire spin skill is available
       if (this.skills.hasFireSpin && !this.fireSpinActive) {
         this.fireSpinActive = true;
         this.fireSpinTimer = 0.5;
@@ -158,8 +146,7 @@ export class Player {
     for (let i = this.afterimages.length - 1; i >= 0; i--) {
       const ai = this.afterimages[i];
       ai.life -= dt;
-      ai.alpha = Math.max(0, ai.life / 0.15) * 0.5;
-      ai.gfx.alpha = ai.alpha;
+      ai.gfx.alpha = Math.max(0, ai.life / 0.15) * 0.45;
       if (ai.life <= 0) {
         this.container.removeChild(ai.gfx);
         this.afterimages.splice(i, 1);
@@ -202,27 +189,19 @@ export class Player {
   }
 
   private spawnAfterimage() {
-    const ai = new Sprite(Texture.from('./images/player.png'));
-    ai.anchor.set(0.5);
-    ai.width = this.w;
-    ai.height = this.h;
-    ai.tint = 0x88eeff;
-    ai.alpha = 0.5;
-    ai.x = 0;
-    ai.y = 0;
-    ai.scale.x = this.facingX < -0.3 ? -Math.abs(ai.scale.x) : Math.abs(ai.scale.x);
-
-    // Insert at beginning so it's behind the player sprite
+    const ai = new Graphics();
+    // Draw a simplified silhouette in cyan
+    ai.beginFill(0x00ccff, 1);
+    // Body
+    ai.drawRoundedRect(-9, -4, 18, 20, 5);
+    // Head
+    ai.drawCircle(0, -15, 9);
+    ai.endFill();
+    ai.alpha = 0.45;
+    // Flip based on facing
+    if (this.facingX < -0.3) ai.scale.x = -1;
     this.container.addChildAt(ai, 0);
-
-    this.afterimages.push({
-      x: this.x,
-      y: this.y,
-      scaleX: ai.scale.x,
-      alpha: 0.5,
-      gfx: ai,
-      life: 0.15,
-    });
+    this.afterimages.push({ gfx: ai, life: 0.15 });
   }
 
   getAttackHitbox(): { cx: number; cy: number; r: number } | null {
@@ -256,7 +235,6 @@ export class Player {
     if (this.invincibleTime > 0) return;
     this.hp = Math.max(0, this.hp - amount);
     this.invincibleTime = 1.2;
-    // Reset combo on taking damage
     this.comboCount = 0;
     this.comboTimer = 0;
   }
@@ -296,48 +274,148 @@ export class Player {
 
     // Drop shadow
     this.shadowGfx.clear();
-    this.shadowGfx.beginFill(0x000000, 0.3);
-    this.shadowGfx.drawEllipse(0, this.h / 2 - 4, this.w * 0.4, 5);
+    this.shadowGfx.beginFill(0x000000, 0.28);
+    this.shadowGfx.drawEllipse(0, 16, 14, 5);
     this.shadowGfx.endFill();
 
-    // Sprite appearance
-    this.sprite.alpha = flicker ? 0.2 : 1.0;
+    // Flicker when invincible
+    this.bodyGfx.alpha = flicker ? 0.2 : 1.0;
+    // Bob animation
+    this.bodyGfx.y = Math.sin(this.bobTimer) * 2;
 
-    // Tint based on state
+    // Choose color scheme based on state
+    let bodyColor = 0x1a4bc0;      // Royal blue armor
+    let accentColor = 0x4488ff;    // Light blue accent
+    let glowColor = 0x88ccff;      // Eye/glow color
+    let sheen = 0x6699ff;          // Armor sheen
+
     if (this.crystalBuffTime > 0) {
-      this.sprite.tint = 0xffdd44; // golden when buffed
+      bodyColor = 0xcc7700; accentColor = 0xffdd44; glowColor = 0xffee88; sheen = 0xffcc22;
     } else if (this.fireSpinActive) {
-      this.sprite.tint = 0xff6622;
+      bodyColor = 0xbb2200; accentColor = 0xff6622; glowColor = 0xffaa44; sheen = 0xff8833;
     } else if (dashing) {
-      this.sprite.tint = 0x88eeff;
+      bodyColor = 0x0077bb; accentColor = 0x33ddff; glowColor = 0x88eeff; sheen = 0x44ccff;
     } else if (this.attackDuration > 0) {
-      this.sprite.tint = 0xffee88;
-    } else {
-      this.sprite.tint = 0xffffff;
+      bodyColor = 0x2255dd; accentColor = 0x88bbff; glowColor = 0xccddff; sheen = 0xaaccff;
     }
 
-    // Flip sprite based on facing direction
-    this.sprite.scale.x = this.facingX < -0.3 ? -Math.abs(this.sprite.scale.x) : Math.abs(this.sprite.scale.x);
+    this.bodyGfx.clear();
 
-    // Bob animation when moving
-    const bobY = Math.sin(this.bobTimer) * 2;
-    this.sprite.y = bobY;
+    // Flip horizontally based on facing direction
+    this.bodyGfx.scale.x = this.facingX < -0.3 ? -1 : 1;
 
-    // Attack & effects
+    // ── Body ──────────────────────────────────────────────────────────────────
+    // Cape/cloak (behind body, darker)
+    const cloakColor = (bodyColor & 0xfefefe) >> 1; // ~50% darkened
+    this.bodyGfx.beginFill(cloakColor, 0.85);
+    this.bodyGfx.drawEllipse(0, 6, 13, 16);
+    this.bodyGfx.endFill();
+
+    // Shoulder pauldrons
+    this.bodyGfx.beginFill(bodyColor);
+    this.bodyGfx.drawEllipse(-13, -2, 6, 5);
+    this.bodyGfx.drawEllipse(13, -2, 6, 5);
+    this.bodyGfx.endFill();
+
+    // Chest plate
+    this.bodyGfx.beginFill(bodyColor);
+    this.bodyGfx.drawRoundedRect(-10, -5, 20, 20, 5);
+    this.bodyGfx.endFill();
+
+    // Chest sheen (left highlight)
+    this.bodyGfx.beginFill(sheen, 0.4);
+    this.bodyGfx.drawRoundedRect(-9, -4, 8, 14, 4);
+    this.bodyGfx.endFill();
+
+    // Emblem on chest
+    this.bodyGfx.beginFill(accentColor, 0.7);
+    this.bodyGfx.drawPolygon([0, -2, 3, 2, 0, 6, -3, 2]);
+    this.bodyGfx.endFill();
+
+    // Belt
+    this.bodyGfx.beginFill(0x221100, 0.6);
+    this.bodyGfx.drawRect(-10, 11, 20, 4);
+    this.bodyGfx.endFill();
+    this.bodyGfx.beginFill(glowColor, 0.3);
+    this.bodyGfx.drawRect(-3, 11, 6, 4);
+    this.bodyGfx.endFill();
+
+    // ── Head / Helmet ─────────────────────────────────────────────────────────
+    // Helmet base
+    this.bodyGfx.beginFill(bodyColor);
+    this.bodyGfx.drawCircle(0, -17, 10);
+    this.bodyGfx.endFill();
+
+    // Crest ridge on top
+    this.bodyGfx.beginFill(accentColor, 0.8);
+    this.bodyGfx.drawRoundedRect(-2, -28, 4, 12, 2);
+    this.bodyGfx.endFill();
+    this.bodyGfx.beginFill(glowColor, 0.5);
+    this.bodyGfx.drawRoundedRect(-1, -28, 2, 8, 1);
+    this.bodyGfx.endFill();
+
+    // Visor slit
+    this.bodyGfx.beginFill(0x001122, 0.75);
+    this.bodyGfx.drawRoundedRect(-8, -20, 16, 5, 2);
+    this.bodyGfx.endFill();
+
+    // Glowing eyes through visor
+    this.bodyGfx.beginFill(glowColor, 0.4);
+    this.bodyGfx.drawCircle(-4, -19, 3.5);
+    this.bodyGfx.drawCircle(4, -19, 3.5);
+    this.bodyGfx.endFill();
+    this.bodyGfx.beginFill(glowColor);
+    this.bodyGfx.drawCircle(-4, -19, 2);
+    this.bodyGfx.drawCircle(4, -19, 2);
+    this.bodyGfx.endFill();
+    // Eye highlight
+    this.bodyGfx.beginFill(0xffffff, 0.7);
+    this.bodyGfx.drawCircle(-3.5, -19.5, 0.7);
+    this.bodyGfx.drawCircle(4.5, -19.5, 0.7);
+    this.bodyGfx.endFill();
+
+    // Cheek guards
+    this.bodyGfx.beginFill(bodyColor);
+    this.bodyGfx.drawRoundedRect(-10, -22, 3, 8, 2);
+    this.bodyGfx.drawRoundedRect(7, -22, 3, 8, 2);
+    this.bodyGfx.endFill();
+
+    // ── Sword ─────────────────────────────────────────────────────────────────
+    // Drawn in world-facing direction (unaffected by bodyGfx scale flip)
+    const sx1 = this.facingX * 12, sy1 = this.facingY * 12;
+    const sx2 = this.facingX * 28, sy2 = this.facingY * 28;
+    // Sword glow
+    this.bodyGfx.lineStyle(7, accentColor, 0.18);
+    this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2, sy2);
+    // Blade
+    this.bodyGfx.lineStyle(3, 0xffee66, 0.95);
+    this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2, sy2);
+    // Shine
+    this.bodyGfx.lineStyle(1.5, 0xffffff, 0.6);
+    this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2 - this.facingX * 4, sy2 - this.facingY * 4);
+    // Guard
+    const perpX = -this.facingY, perpY = this.facingX;
+    this.bodyGfx.lineStyle(3, 0xcc8800, 0.9);
+    this.bodyGfx.moveTo(sx1 + perpX * 7, sy1 + perpY * 7);
+    this.bodyGfx.lineTo(sx1 - perpX * 7, sy1 - perpY * 7);
+    this.bodyGfx.lineStyle(0);
+
+    // ── Attack effects ────────────────────────────────────────────────────────
     this.attackGfx.clear();
 
     // Dash speed lines
     if (dashing) {
-      for (let i = 0; i < 3; i++) {
-        const offset = (i - 1) * 8;
-        const perpX = -this.facingY;
-        const perpY = this.facingX;
-        const lx = -this.facingX * (10 + i * 6) + perpX * offset;
-        const ly = -this.facingY * (10 + i * 6) + perpY * offset;
-        const alpha = 0.6 - i * 0.15;
-        this.attackGfx.lineStyle(2, 0x88eeff, alpha);
+      for (let i = 0; i < 4; i++) {
+        const offset = (i - 1.5) * 7;
+        const perpLx = -this.facingY;
+        const perpLy = this.facingX;
+        const lx = -this.facingX * (8 + i * 5) + perpLx * offset;
+        const ly = -this.facingY * (8 + i * 5) + perpLy * offset;
+        const len = 14 + i * 2;
+        const alpha = 0.55 - i * 0.1;
+        this.attackGfx.lineStyle(2, 0x44eeff, alpha);
         this.attackGfx.moveTo(lx, ly);
-        this.attackGfx.lineTo(lx - this.facingX * 12, ly - this.facingY * 12);
+        this.attackGfx.lineTo(lx - this.facingX * len, ly - this.facingY * len);
       }
     }
 
@@ -346,54 +424,63 @@ export class Player {
       const spinProgress = 1 - this.fireSpinTimer / 0.5;
       const spinAngle = spinProgress * Math.PI * 4;
       const r = this.attackRange * 1.2;
+      const fade = 1 - spinProgress;
 
-      // Spinning fire trail
-      for (let i = 0; i < 6; i++) {
-        const a = spinAngle + (i / 6) * Math.PI * 2;
+      // Outer ring
+      this.attackGfx.lineStyle(2, 0xff6600, 0.35 * fade);
+      this.attackGfx.drawCircle(0, 0, r);
+
+      for (let i = 0; i < 8; i++) {
+        const a = spinAngle + (i / 8) * Math.PI * 2;
         const px = Math.cos(a) * r;
         const py = Math.sin(a) * r;
-        const alpha = 0.6 * (1 - spinProgress);
-        this.attackGfx.beginFill(0xff4400, alpha);
-        this.attackGfx.drawCircle(px, py, 8 - i);
+        this.attackGfx.lineStyle(0);
+        this.attackGfx.beginFill(0xff6600, 0.55 * fade);
+        this.attackGfx.drawCircle(px, py, 7 - i * 0.5);
+        this.attackGfx.endFill();
+        // Trail dot
+        const a2 = a - 0.3;
+        this.attackGfx.beginFill(0xff9922, 0.3 * fade);
+        this.attackGfx.drawCircle(Math.cos(a2) * r, Math.sin(a2) * r, 4);
         this.attackGfx.endFill();
       }
-
-      // Circle outline
-      this.attackGfx.lineStyle(2, 0xff6600, 0.4 * (1 - spinProgress));
-      this.attackGfx.drawCircle(0, 0, r);
     }
 
-    // Attack slash arc - improved sword slash visual
+    // Attack slash arc
     if (this.attackDuration > 0) {
-      const ax = this.facingX * this.attackRange * 0.6;
-      const ay = this.facingY * this.attackRange * 0.6;
       const r = this.attackRange * 0.55;
       const progress = this.attackDuration / 0.14;
-
-      // Slash arc (sweeping motion)
       const baseAngle = Math.atan2(this.facingY, this.facingX);
-      const sweepStart = baseAngle - 0.8;
-      const sweepEnd = baseAngle + 0.8;
+      const sweepStart = baseAngle - 0.85;
+      const sweepEnd = baseAngle + 0.85;
       const currentSweep = sweepStart + (sweepEnd - sweepStart) * (1 - progress);
 
-      // Bright slash trail
-      this.attackGfx.lineStyle(4, 0xffffff, 0.9 * progress);
-      this.attackGfx.arc(0, 0, r * 0.85, sweepStart, currentSweep);
+      // Outer glow arc
+      this.attackGfx.lineStyle(12, accentColor, 0.18 * progress);
+      this.attackGfx.arc(0, 0, r * 0.82, sweepStart, currentSweep);
+      // Mid glow
+      this.attackGfx.lineStyle(6, accentColor, 0.35 * progress);
+      this.attackGfx.arc(0, 0, r * 0.82, sweepStart, currentSweep);
+      // Core white slash
+      this.attackGfx.lineStyle(3, 0xffffff, 0.92 * progress);
+      this.attackGfx.arc(0, 0, r * 0.82, sweepStart, currentSweep);
 
-      // Outer glow
-      this.attackGfx.lineStyle(8, 0xffee44, 0.3 * progress);
-      this.attackGfx.arc(0, 0, r * 0.85, sweepStart, currentSweep);
-
-      // Impact point glow
-      const tipX = Math.cos(currentSweep) * r * 0.85;
-      const tipY = Math.sin(currentSweep) * r * 0.85;
-      this.attackGfx.beginFill(0xffffff, 0.8 * progress);
+      // Impact tip glow
+      const tipX = Math.cos(currentSweep) * r * 0.82;
+      const tipY = Math.sin(currentSweep) * r * 0.82;
+      this.attackGfx.lineStyle(0);
+      this.attackGfx.beginFill(0xffffff, 0.9 * progress);
       this.attackGfx.drawCircle(tipX, tipY, 5 * progress);
       this.attackGfx.endFill();
+      this.attackGfx.beginFill(accentColor, 0.5 * progress);
+      this.attackGfx.drawCircle(tipX, tipY, 9 * progress);
+      this.attackGfx.endFill();
 
-      // Glow at center of hitbox
-      this.attackGfx.beginFill(0xffee44, 0.2 * progress);
-      this.attackGfx.drawCircle(ax, ay, r * 0.6);
+      // Center hitbox glow
+      const ax = this.facingX * this.attackRange * 0.6;
+      const ay = this.facingY * this.attackRange * 0.6;
+      this.attackGfx.beginFill(accentColor, 0.15 * progress);
+      this.attackGfx.drawCircle(ax, ay, r * 0.55);
       this.attackGfx.endFill();
     }
   }

@@ -1,3 +1,4 @@
+import { Graphics } from 'pixi.js';
 import { Enemy, type FireFn } from './Enemy';
 import type { Player } from './Player';
 import type { WorldMap } from '../maps/WorldMap';
@@ -11,11 +12,11 @@ export class RangedEnemy extends Enemy {
 
   constructor(
     x: number, y: number, hp = 120, speed = 60, damage = 12,
-    xpReward = 30, spriteUrl = './images/enemy2.png',
+    xpReward = 30,
     shootInterval = 2.2, shootRange = 280,
     projectileDmg = 18, projectileColor = 0x00ccff,
   ) {
-    super(x, y, hp, speed, damage, 40, xpReward, 36, 36, spriteUrl);
+    super(x, y, hp, speed, damage, 40, xpReward, 36, 36);
     this.shootInterval = shootInterval;
     this.shootRange = shootRange;
     this.projectileDmg = projectileDmg;
@@ -63,8 +64,26 @@ export class RangedEnemy extends Enemy {
     this.syncGfx();
   }
 
-  protected render() {
-    super.render();
-    if (this.hitFlash <= 0) { this.sprite.tint = 0xaaddff; }
+  protected drawBody(g: Graphics, isHit: boolean) {
+    if (isHit) {
+      g.beginFill(0xffffff, 0.95);
+      g.drawEllipse(0, 2, this.w * 0.44, this.h * 0.5);
+      g.drawCircle(0, -this.h * 0.38, this.w * 0.3);
+      g.endFill();
+      return;
+    }
+    // Arcane mage: teal-blue robed figure
+    this.drawDemonBody(g, 0x1a4488, 0x3388cc, 0x55eeff);
+
+    // Magical orb held in front
+    g.beginFill(0x00aaee, 0.25);
+    g.drawCircle(this.w * 0.4, 0, 8);
+    g.endFill();
+    g.beginFill(0x22ddff, 0.8);
+    g.drawCircle(this.w * 0.4, 0, 5);
+    g.endFill();
+    g.beginFill(0xaaeeff);
+    g.drawCircle(this.w * 0.4 - 1.5, -1.5, 2);
+    g.endFill();
   }
 }
