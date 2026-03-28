@@ -330,6 +330,7 @@ export class GameScene {
     if (tookDamage) {
       this.shake(8, 0.3);
       this.particles.emitHit(this.player.x, this.player.y);
+      this.audio.playSfxPlayerHurt();
     }
 
     // Player attacks
@@ -341,12 +342,15 @@ export class GameScene {
       if (item === 'heart') {
         this.player.heal(25);
         this.particles.emit(this.player.x, this.player.y, 6, 0xff4488, 80, 150, 0.4, 0.2, 3);
+        this.audio.playSfxPickup();
       } else if (item === 'xpGem') {
         this.player.addXp(15);
         this.particles.emit(this.player.x, this.player.y, 6, 0x44aaff, 80, 150, 0.4, 0.2, 3);
+        this.audio.playSfxPickup();
       } else if (item === 'crystal') {
         this.player.crystalBuffTime = 10;
         this.particles.emit(this.player.x, this.player.y, 10, 0xffdd44, 120, 200, 0.5, 0.3, 4);
+        this.audio.playSfxPickup();
       }
     }
 
@@ -355,6 +359,7 @@ export class GameScene {
       this.player.justLeveledUp = false;
       this.particles.showLevelUp(this.player.x, this.player.y - 20);
       this.hud.showMessage(`✨ LEVEL UP! Lv.${this.player.level}`, 2);
+      this.audio.playSfxLevelUp();
       const skills = getRandomSkills(3, this.player.acquiredSkillIds);
       if (skills.length > 0) {
         this.state = 'skill_select';
@@ -389,7 +394,11 @@ export class GameScene {
       if (this.bossEntranceTimer > 0) {
         this.bossEntranceTimer -= dt;
       } else {
+        const prevCount = this.projectiles.count;
         this.boss.update(dt, this.player, this.map, this.fireFn);
+        if (this.projectiles.count > prevCount) {
+          this.audio.playSfxBossShoot();
+        }
       }
     }
 
@@ -398,7 +407,7 @@ export class GameScene {
     const projHit = this.projectiles.checkHitPlayer(this.player);
     if (projHit) {
       const wasInv = this.player.invincibleTime > (1.2 - 0.01);
-      if (!wasInv) { this.shake(6, 0.25); this.particles.emitHit(this.player.x, this.player.y); }
+      if (!wasInv) { this.shake(6, 0.25); this.particles.emitHit(this.player.x, this.player.y); this.audio.playSfxPlayerHurt(); }
     }
     // Player projectile hits on enemies
     const projEnemyHits = this.projectiles.checkHitEnemies(this.enemies);
@@ -450,8 +459,9 @@ export class GameScene {
         this.shake(15, 0.5);
         this.particles.emitBossRage(this.boss.x, this.boss.y);
         this.hud.triggerFlash(0xff0000, 0.8);
-        this.hud.showMessage('⚠ PHASE 2 ⚠\n速度・ダメージ増加！', 2.5);
+        this.hud.showMessage('⚠ PHASE 2 ⚠\n突進・弾幕強化！', 2.5);
         this.hitStop(0.15);
+        this.audio.playSfxBossPhase();
       }
       if (this.boss.phase3Transitioned) {
         this.boss.phase3Transitioned = false;
@@ -461,6 +471,7 @@ export class GameScene {
         this.hud.triggerFlash(0xaa00ff, 1.0);
         this.hud.showMessage('💀 PHASE 3 💀\n弾幕・全力全開！', 3);
         this.hitStop(0.2);
+        this.audio.playSfxBossPhase();
       }
     }
 
@@ -541,6 +552,10 @@ export class GameScene {
           this.player.registerHit();
           this.hud.pulseCombo();
 
+          // SFX
+          if (isCrit) this.audio.playSfxCrit();
+          else this.audio.playSfxHit();
+
           // Knockback
           enemy.applyKnockback(this.player.x, this.player.y, 300 * this.player.skills.knockbackMult);
 
@@ -571,6 +586,7 @@ export class GameScene {
             this.player.addXp(enemy.xpReward);
             this.items.dropFromEnemy(enemy.x, enemy.y);
             this.hitStop(0.06);
+            this.audio.playSfxEnemyDeath();
           }
         }
       }
@@ -586,6 +602,8 @@ export class GameScene {
           this.boss.applyKnockback(this.player.x, this.player.y, 100 * this.player.skills.knockbackMult);
           this.particles.emitHit(hb.cx, hb.cy);
           this.particles.showDamage(this.boss.x, this.boss.y, damage, true, isCrit);
+          if (isCrit) this.audio.playSfxCrit();
+          else this.audio.playSfxHit();
           if (this.player.skills.hasVampiric) {
             const heal = Math.round(damage * this.player.skills.vampiricRatio);
             if (heal > 0) this.player.heal(heal);

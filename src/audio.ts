@@ -62,6 +62,7 @@ export class AudioManager {
 
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private started = false;
   private currentTrack: 'field' | 'boss' | null = null;
   private generation = 0;
@@ -100,6 +101,9 @@ export class AudioManager {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.4;
       this.masterGain.connect(this.ctx.destination);
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 0.5;
+      this.sfxGain.connect(this.ctx.destination);
     } else if (this.ctx) {
       this.ctx.resume();
     }
@@ -295,5 +299,174 @@ export class AudioManager {
     scheduleNotes(bass);
 
     setTimeout(() => this.synthLoop(track, gen), (duration - 0.05) * 1000);
+  }
+
+  // ================================================================
+  // SFX — Web Audio API synthesized sound effects
+  // ================================================================
+
+  private playNoise(duration: number, volume: number, freqStart: number, freqEnd: number, type: OscillatorType = 'square') {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 20), t + duration);
+    env.gain.setValueAtTime(volume, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + duration);
+  }
+
+  /** Player melee attack connects with enemy */
+  playSfxHit() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    // Metallic slash
+    this.playNoise(0.08, 0.35, 800, 200, 'sawtooth');
+    // Impact thud
+    this.playNoise(0.06, 0.25, 150, 60, 'square');
+    // Bright click
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(400, t + 0.04);
+    env.gain.setValueAtTime(0.15, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.04);
+  }
+
+  /** Critical hit — sharper, louder, with a ring */
+  playSfxCrit() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    // Sharp slash
+    this.playNoise(0.1, 0.45, 1400, 300, 'sawtooth');
+    // Deep impact
+    this.playNoise(0.08, 0.35, 200, 50, 'square');
+    // High ring
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2000, t);
+    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.15);
+    env.gain.setValueAtTime(0.2, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
+
+  /** Player takes damage */
+  playSfxPlayerHurt() {
+    if (!this.ctx || !this.sfxGain) return;
+    // Low thud
+    this.playNoise(0.15, 0.4, 120, 40, 'sawtooth');
+    // Crunch
+    this.playNoise(0.08, 0.3, 300, 80, 'square');
+  }
+
+  /** Enemy dies */
+  playSfxEnemyDeath() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    // Pop burst
+    this.playNoise(0.12, 0.3, 400, 60, 'square');
+    // Scatter
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.15);
+    env.gain.setValueAtTime(0.2, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
+
+  /** Boss phase transition roar */
+  playSfxBossPhase() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    // Deep rumble
+    for (let i = 0; i < 3; i++) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(60 + i * 30, t);
+      osc.frequency.exponentialRampToValueAtTime(30 + i * 10, t + 0.5);
+      env.gain.setValueAtTime(0.25, t + i * 0.05);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(t + i * 0.05);
+      osc.stop(t + 0.5);
+    }
+    // High scream
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, t + 0.1);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.6);
+    env.gain.setValueAtTime(0.18, t + 0.1);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t + 0.1);
+    osc.stop(t + 0.6);
+  }
+
+  /** Boss projectile fire */
+  playSfxBossShoot() {
+    if (!this.ctx || !this.sfxGain) return;
+    this.playNoise(0.1, 0.25, 500, 150, 'sawtooth');
+    this.playNoise(0.06, 0.2, 200, 80, 'square');
+  }
+
+  /** Item / XP pickup */
+  playSfxPickup() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.linearRampToValueAtTime(1200, t + 0.08);
+    env.gain.setValueAtTime(0.2, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  }
+
+  /** Level up jingle */
+  playSfxLevelUp() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = notes[i];
+      env.gain.setValueAtTime(0, t + i * 0.08);
+      env.gain.linearRampToValueAtTime(0.22, t + i * 0.08 + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.15);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(t + i * 0.08);
+      osc.stop(t + i * 0.08 + 0.15);
+    }
   }
 }

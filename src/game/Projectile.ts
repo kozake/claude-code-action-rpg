@@ -14,6 +14,8 @@ export class ProjectileSystem {
   readonly container: Container;
   private list: ProjEntry[] = [];
 
+  get count() { return this.list.length; }
+
   constructor() { this.container = new Container(); }
 
   add(x: number, y: number, vx: number, vy: number, damage: number,
