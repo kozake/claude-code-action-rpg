@@ -184,19 +184,22 @@ export class Boss extends Enemy {
 
     if (this.crownGfx) this.crownGfx.y = this.sprite.y;
 
-    // Aura effect
-    this.auraGfx.clear();
-    if (this.isEnraged) {
-      this.auraGfx.beginFill(0xaa00ff, 0.12 + Math.sin(this.floatTimer * 4) * 0.06);
-      this.auraGfx.drawCircle(0, 0, this.w * 0.9);
-      this.auraGfx.endFill();
-    } else if (this.isAngry) {
-      this.auraGfx.beginFill(0xff2200, 0.08 + Math.sin(this.floatTimer * 3) * 0.04);
-      this.auraGfx.drawCircle(0, 0, this.w * 0.7);
-      this.auraGfx.endFill();
+    // Aura effect (guard: not yet initialised during super() call)
+    if (this.auraGfx) {
+      this.auraGfx.clear();
+      if (this.isEnraged) {
+        this.auraGfx.beginFill(0xaa00ff, 0.12 + Math.sin(this.floatTimer * 4) * 0.06);
+        this.auraGfx.drawCircle(0, 0, this.w * 0.9);
+        this.auraGfx.endFill();
+      } else if (this.isAngry) {
+        this.auraGfx.beginFill(0xff2200, 0.08 + Math.sin(this.floatTimer * 3) * 0.04);
+        this.auraGfx.drawCircle(0, 0, this.w * 0.7);
+        this.auraGfx.endFill();
+      }
     }
 
     // Telegraph warning circle
+    if (!this.telegraphGfx) return;
     this.telegraphGfx.clear();
     if (this.telegraphTimer > 0) {
       const progress = 1 - this.telegraphTimer / 1.0;

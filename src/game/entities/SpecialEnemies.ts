@@ -79,7 +79,8 @@ export class ChargerEnemy extends Enemy {
     if (this.hitFlash <= 0 && this.chargeState !== 'telegraph') {
       this.sprite.tint = 0xff8844; // orange tint
     }
-    // Telegraph visual
+    // Telegraph visual (guard: not yet initialised during super() call)
+    if (!this.telegraphGfx) return;
     this.telegraphGfx.clear();
     if (this.chargeState === 'telegraph') {
       this.sprite.tint = 0xff0000;
@@ -164,6 +165,7 @@ export class BomberEnemy extends Enemy {
 
   protected render() {
     super.render();
+    if (!this.tickGfx) return;
     this.tickGfx.clear();
     if (this.bombState === 'ticking') {
       const progress = 1 - this.bombTimer / this.fuseTime;
@@ -235,6 +237,7 @@ export class ShieldEnemy extends Enemy {
     super.render();
     if (this.hitFlash <= 0) this.sprite.tint = 0x88aacc;
     // Draw shield arc
+    if (!this.shieldGfx) return;
     this.shieldGfx.clear();
     const sr = this.w * 0.7;
     const sa = this.shieldAngle - Math.PI / 3;
