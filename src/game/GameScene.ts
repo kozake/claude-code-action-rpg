@@ -16,84 +16,20 @@ import { AudioManager } from '../audio';
 import { ParticleSystem } from './Particles';
 import { ProjectileSystem } from './Projectile';
 import { ItemSystem } from './Items';
+import { ScreenEffects } from './ScreenEffects';
 import { createDefaultSkillStats, getRandomSkills } from './Skills';
+import { buildFloorConfigs } from './DungeonConfig';
 import type { Skill } from './Skills';
+import type { FloorConfig, EnemyType } from './DungeonConfig';
 
-type GameState = 'title' | 'playing' | 'skill_select' | 'gameover' | 'win';
-
-// Enemy sprite URLs no longer used (procedural rendering)
-
-// Wave definitions: [tileCol, tileRow, type, hp, speed]
-type EnemyType = 'basic' | 'ranged' | 'charger' | 'bomber' | 'shield' | 'summoner';
-interface WaveDef {
-  enemies: [number, number, EnemyType, number, number][];
-  message: string;
-}
-
-const WAVES: WaveDef[] = [
-  {
-    message: '⚔ Wave 1: 前哨戦',
-    enemies: [
-      [14, 5, 'basic', 240, 94], [22, 8, 'basic', 230, 101],
-      [9, 14, 'basic', 260, 94], [34, 4, 'basic', 240, 106],
-      [27, 17, 'basic', 250, 90], [5, 8, 'basic', 220, 101],
-      [40, 12, 'basic', 240, 97], [18, 20, 'basic', 230, 101],
-      [45, 5, 'basic', 220, 106], [30, 25, 'basic', 260, 94],
-    ],
-  },
-  {
-    message: '⚔ Wave 2: 遠距離の脅威',
-    enemies: [
-      [38, 13, 'ranged', 290, 71], [42, 7, 'ranged', 290, 71],
-      [30, 10, 'ranged', 310, 77], [7, 10, 'ranged', 280, 71],
-      [15, 22, 'ranged', 296, 71], [35, 20, 'ranged', 284, 69],
-      [18, 22, 'basic', 316, 106], [7, 20, 'basic', 330, 101],
-      [46, 18, 'basic', 296, 113], [25, 6, 'basic', 310, 104],
-      [40, 22, 'basic', 300, 106], [12, 6, 'basic', 304, 101],
-    ],
-  },
-  {
-    message: '⚔ Wave 3: 突撃部隊',
-    enemies: [
-      [15, 6, 'charger', 370, 90], [35, 10, 'charger', 370, 90],
-      [8, 20, 'charger', 356, 94], [42, 18, 'charger', 360, 92],
-      [25, 20, 'bomber', 210, 113], [10, 15, 'bomber', 210, 113],
-      [40, 8, 'bomber', 200, 117], [20, 5, 'bomber', 210, 113],
-      [40, 15, 'ranged', 330, 78], [28, 25, 'ranged', 320, 75],
-    ],
-  },
-  {
-    message: '⚔ Wave 4: 精鋭部隊',
-    enemies: [
-      [20, 10, 'shield', 460, 69], [30, 15, 'shield', 460, 69],
-      [10, 6, 'shield', 440, 67], [44, 12, 'shield', 450, 71],
-      [12, 20, 'summoner', 520, 51], [38, 20, 'summoner', 500, 48],
-      [38, 8, 'charger', 410, 94], [14, 14, 'charger', 400, 92],
-      [25, 5, 'ranged', 360, 78], [45, 20, 'bomber', 240, 117],
-      [6, 14, 'bomber', 230, 115], [30, 22, 'ranged', 350, 75],
-    ],
-  },
-  {
-    message: '💀 Final Wave: 総攻撃',
-    enemies: [
-      [10, 8, 'charger', 440, 101], [40, 8, 'charger', 440, 101],
-      [8, 20, 'charger', 430, 104], [42, 20, 'charger', 436, 101],
-      [25, 12, 'summoner', 580, 58], [15, 25, 'summoner', 560, 55],
-      [38, 25, 'summoner', 570, 55], [15, 18, 'shield', 520, 75],
-      [35, 18, 'shield', 520, 75], [8, 12, 'shield', 500, 71],
-      [44, 14, 'shield', 510, 74], [20, 24, 'bomber', 270, 124],
-      [30, 24, 'bomber', 270, 124], [8, 5, 'bomber', 256, 127],
-      [44, 5, 'bomber', 260, 124], [42, 22, 'ranged', 410, 81],
-      [12, 22, 'ranged', 400, 81], [28, 8, 'ranged', 400, 81],
-    ],
-  },
-];
+type GameState = 'title' | 'playing' | 'skill_select' | 'gameover' | 'win' | 'floor_transition';
 
 export class GameScene {
   readonly container: Container;
   private world: Container;
   private ui: Container;
 
+  private app: Application;
   private map: WorldMap;
   private player: Player;
   private enemies: Enemy[] = [];
@@ -101,6 +37,7 @@ export class GameScene {
   private particles: ParticleSystem;
   private projectiles: ProjectileSystem;
   private items: ItemSystem;
+  private screenEffects: ScreenEffects;
 
   private joystick: VirtualJoystick;
   private attackButton: AttackButton;
@@ -141,11 +78,21 @@ export class GameScene {
   // Results screen
   private resultsShown = false;
 
+  // Dungeon floor system
+  private floorConfigs: FloorConfig[];
+  private currentFloor = 0; // index into floorConfigs
+  private totalFloors: number;
+
   private titleOverlay: Container;
 
   constructor(app: Application) {
+    this.app = app;
     this.screenW = app.screen.width;
     this.screenH = app.screen.height;
+
+    // Build floor configs
+    this.floorConfigs = buildFloorConfigs();
+    this.totalFloors = this.floorConfigs.length;
 
     this.container = new Container();
     this.world = new Container();
@@ -153,18 +100,19 @@ export class GameScene {
     this.container.addChild(this.world);
     this.container.addChild(this.ui);
 
-    // Map
-    this.map = new WorldMap(app.renderer as import('pixi.js').Renderer);
+    // Map (first floor)
+    const firstFloor = this.floorConfigs[0];
+    this.map = new WorldMap(app.renderer as import('pixi.js').Renderer, firstFloor);
     this.world.addChild(this.map.container);
 
     // Player
     const skillStats = createDefaultSkillStats();
-    const spawn = this.map.findSafeSpawn(3, 2);
+    const spawn = this.map.getSpawnPosition();
     this.player = new Player(spawn.x, spawn.y, skillStats);
     this.world.addChild(this.player.container);
 
-    // Boss
-    this.boss = new Boss(TILE_SIZE * 25, TILE_SIZE * 35);
+    // Boss (created but hidden until floor 5)
+    this.boss = new Boss(TILE_SIZE * 15, TILE_SIZE * 15);
     this.boss.container.visible = false;
     this.world.addChild(this.boss.container);
 
@@ -175,6 +123,9 @@ export class GameScene {
     this.world.addChild(this.projectiles.container);
     this.items = new ItemSystem();
     this.world.addChild(this.items.container);
+
+    // Screen effects
+    this.screenEffects = new ScreenEffects(this.screenW, this.screenH);
 
     // UI
     this.joystick = new VirtualJoystick(this.screenW, this.screenH);
@@ -192,6 +143,7 @@ export class GameScene {
     this.ui.addChild(this.joystick.container);
     this.ui.addChild(this.attackButton.container);
     this.ui.addChild(this.skillSelect.container);
+    this.ui.addChild(this.screenEffects.container);
 
     // Title
     this.titleOverlay = this.buildTitleOverlay();
@@ -203,7 +155,7 @@ export class GameScene {
       this.titleOverlay.visible = false;
       this.audio.unlock();
       this.audio.playField();
-      this.startWave(0);
+      this.startFloorWave(0);
     };
     window.addEventListener('touchstart', startGame, { once: true });
     window.addEventListener('keydown', startGame, { once: true });
@@ -227,7 +179,7 @@ export class GameScene {
     overlay.addChild(title);
 
     const sub = new Text(
-      'ウェーブを突破してボスを倒せ！\n\nスマホ: 左で移動 / 右⚔で攻撃 / 💨でスキル\nPC: WASD移動 / Space攻撃 / Xスキル\n\nタップまたはキーでスタート',
+      '全5階のダンジョンを踏破し\n魔王を倒せ！\n\nスマホ: 左で移動 / 右⚔で攻撃 / 💨でスキル\nPC: WASD移動 / Space攻撃 / Xスキル\n\nタップまたはキーでスタート',
       { fontSize: 15, fill: 0xffffff, align: 'center', stroke: 0x000000, strokeThickness: 3, lineHeight: 22 },
     );
     sub.anchor.set(0.5);
@@ -236,24 +188,138 @@ export class GameScene {
     return overlay;
   }
 
-  private startWave(index: number) {
-    if (index >= WAVES.length) {
+  private startFloorWave(index: number) {
+    const config = this.floorConfigs[this.currentFloor];
+    this.hud.showFloor(this.currentFloor + 1, this.totalFloors);
+    if (index >= config.waves.length) {
       this.allWavesCleared = true;
-      this.hud.showMessage('🚪 ボス部屋が開いた！\n奥へ進め！', 3);
+      if (config.hasBoss) {
+        // Boss floor - trigger boss directly
+        this.triggerBoss();
+      } else {
+        // Show stairs
+        this.map.showStairs();
+        this.hud.showMessage('🚪 階段が現れた！\n次の階へ進め！', 3);
+        this.audio.playSfxStairs();
+      }
       return;
     }
     this.currentWave = index;
     this.waveActive = true;
-    const wave = WAVES[index];
+    const wave = config.waves[index];
     this.hud.showMessage(wave.message, 2);
-    this.hud.showWave(index + 1, WAVES.length);
+    this.hud.showWave(index + 1, config.waves.length);
 
-    for (const [tc, tr, type, hp, spd] of wave.enemies) {
-      const { x: px, y: py } = this.map.findSafeSpawn(tc, tr);
-      const e = this.createEnemy(type, px, py, hp, spd);
-      this.enemies.push(e);
-      this.world.addChild(e.container);
+    // Spawn enemies from wave composition using room centers
+    const centers = this.map.getRoomCenters();
+    for (const comp of wave.composition) {
+      const hp = Math.round(comp.hpBase * config.enemyHpMult);
+      const spd = Math.round(comp.speedBase * config.enemySpeedMult);
+      for (let i = 0; i < comp.count; i++) {
+        // Pick a random room center (avoid spawn room = index 0)
+        const roomIdx = centers.length > 1 ? 1 + Math.floor(Math.random() * (centers.length - 1)) : 0;
+        const center = centers[roomIdx];
+        const ox = (Math.random() - 0.5) * TILE_SIZE * 3;
+        const oy = (Math.random() - 0.5) * TILE_SIZE * 3;
+        const spawnCol = Math.floor((center.x + ox) / TILE_SIZE);
+        const spawnRow = Math.floor((center.y + oy) / TILE_SIZE);
+        const { x: px, y: py } = this.map.findSafeSpawn(spawnCol, spawnRow);
+        const e = this.createEnemy(comp.type, px, py, hp, spd);
+        this.enemies.push(e);
+        this.world.addChild(e.container);
+      }
     }
+  }
+
+  private triggerBoss() {
+    this.bossTriggered = true;
+    // Position boss in arena center
+    const centers = this.map.getRoomCenters();
+    const arena = centers.length > 1 ? centers[centers.length - 1] : centers[0];
+    this.boss.x = arena.x;
+    this.boss.y = arena.y;
+    this.boss.container.x = arena.x;
+    this.boss.container.y = arena.y;
+    this.boss.container.visible = true;
+    this.audio.playBoss();
+    this.shake(15, 0.5);
+    this.hud.triggerFlash(0x440000, 0.8);
+    this.map.lockBossRoom();
+    this.bossEntranceTimer = 1.5;
+    this.screenEffects.showLetterbox();
+    this.hud.showMessage('👹 BOSS: 魔王降臨\n覚悟しろ！', 3);
+    setTimeout(() => this.screenEffects.hideLetterbox(), 1500);
+  }
+
+  private transitionToNextFloor() {
+    if (this.currentFloor >= this.totalFloors - 1) return;
+    const nextFloor = this.currentFloor + 1;
+    const nextConfig = this.floorConfigs[nextFloor];
+    const floorLabel = `B${nextFloor + 1}F`;
+    const themeName = nextConfig.theme.nameJa;
+
+    this.state = 'floor_transition';
+    this.audio.playSfxFloorTransition();
+    this.screenEffects.startFloorTransition(
+      `${floorLabel} ─ ${themeName}`,
+      nextConfig.hasBoss ? '最終階 ─ ボスが待ち受ける' : `ダンジョン 第${nextFloor + 1}層`,
+      // onMidpoint: rebuild the floor
+      () => {
+        // Cleanup current floor
+        this.world.removeChild(this.map.container);
+        this.map.destroy();
+        for (const e of this.enemies) this.world.removeChild(e.container);
+        this.enemies = [];
+        this.projectiles.clear();
+        this.items.clear();
+
+        // Build new floor
+        this.currentFloor = nextFloor;
+        this.map = new WorldMap(this.app.renderer as import('pixi.js').Renderer, nextConfig);
+        this.world.addChildAt(this.map.container, 0);
+
+        // Reset player position and heal
+        const spawn = this.map.getSpawnPosition();
+        this.player.x = spawn.x;
+        this.player.y = spawn.y;
+        this.player.container.x = spawn.x;
+        this.player.container.y = spawn.y;
+        if (nextConfig.healPercent > 0) {
+          const healAmt = Math.round(this.player.maxHp * nextConfig.healPercent);
+          this.player.heal(healAmt);
+        }
+
+        // Reset wave state
+        this.currentWave = 0;
+        this.waveActive = false;
+        this.waveDelay = 0;
+        this.allWavesCleared = false;
+
+        // Rebuild minimap
+        this.minimap.rebuild(this.map);
+
+        // Boss floor setup
+        if (nextConfig.hasBoss) {
+          const centers = this.map.getRoomCenters();
+          const arena = centers.length > 1 ? centers[centers.length - 1] : centers[0];
+          this.boss = new Boss(arena.x, arena.y);
+          this.boss.container.visible = false;
+          this.world.addChild(this.boss.container);
+          this.bossTriggered = false;
+          this.resultsShown = false;
+        }
+      },
+      // onComplete: resume play
+      () => {
+        this.state = 'playing';
+        if (this.floorConfigs[this.currentFloor].hasBoss) {
+          // Boss floor: trigger boss immediately
+          this.triggerBoss();
+        } else {
+          this.startFloorWave(0);
+        }
+      },
+    );
   }
 
   private createEnemy(type: EnemyType, x: number, y: number, hp: number, spd: number): Enemy {
@@ -286,6 +352,12 @@ export class GameScene {
     const rawDt = delta / 60;
     if (this.state === 'title') return;
 
+    // Floor transition animation
+    if (this.state === 'floor_transition') {
+      this.screenEffects.update(rawDt);
+      return;
+    }
+
     // Skill select pauses game
     if (this.state === 'skill_select') {
       this.skillSelect.update(rawDt);
@@ -298,6 +370,9 @@ export class GameScene {
     }
 
     if (this.state === 'gameover' || this.state === 'win') return;
+
+    // Update screen effects (vignette etc.)
+    this.screenEffects.update(rawDt);
 
     // Hit stop freeze
     if (this.hitStopTime > 0) {
@@ -434,22 +509,16 @@ export class GameScene {
       this.waveDelay -= dt;
       if (this.waveDelay <= 0) {
         this.enemies = [];
-        this.startWave(this.currentWave + 1);
+        this.startFloorWave(this.currentWave + 1);
       }
     }
 
-    // Boss room entry
-    const playerRow = Math.floor(this.player.y / TILE_SIZE);
-    if (!this.bossTriggered && this.allWavesCleared && playerRow >= this.map.bossRowStart) {
-      this.bossTriggered = true;
-      this.audio.playBoss();
-      this.shake(15, 0.5);
-      this.hud.triggerFlash(0x440000, 0.8);
-      this.map.lockBossRoom();
-      this.boss.container.visible = true;
-      // Boss entrance cinematic
-      this.bossEntranceTimer = 1.5;
-      this.hud.showMessage('👹 BOSS: 魔王降臨\n覚悟しろ！', 3);
+    // Stairs check (non-boss floors)
+    if (this.allWavesCleared && !this.floorConfigs[this.currentFloor].hasBoss) {
+      if (this.map.isOnStairs(this.player.x, this.player.y)) {
+        this.transitionToNextFloor();
+        return;
+      }
     }
 
     // Boss phase transitions
@@ -667,6 +736,7 @@ export class GameScene {
     this.joystick.onResize(w, h);
     this.attackButton.onResize(w, h);
     this.skillSelect.onResize(w, h);
+    this.screenEffects.resize(w, h);
     if (this.titleOverlay.children[0] instanceof Graphics) {
       const bg = this.titleOverlay.children[0] as Graphics;
       bg.clear(); bg.beginFill(0x000000, 0.78); bg.drawRect(0, 0, w, h); bg.endFill();

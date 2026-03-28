@@ -1,9 +1,7 @@
 import { Graphics, Container } from 'pixi.js';
-import { MAP_COLS, MAP_ROWS, TILE, type WorldMap } from '../game/maps/WorldMap';
+import { TILE, type WorldMap } from '../game/maps/WorldMap';
 
 const MM_SCALE = 3; // pixels per tile
-const MM_W = MAP_COLS * MM_SCALE;
-const MM_H = MAP_ROWS * MM_SCALE;
 const MARGIN = 10;
 
 export class Minimap {
@@ -11,25 +9,48 @@ export class Minimap {
   private bg: Graphics;
   private dynamic: Graphics;
   private screenW: number;
+  private mapCols = 0;
+  private mapRows = 0;
 
   constructor(screenW: number, _screenH: number, map: WorldMap) {
     this.screenW = screenW;
     this.container = new Container();
     this.container.alpha = 0.7;
 
-    // Static background (walls & floor)
     this.bg = new Graphics();
+    this.dynamic = new Graphics();
+    this.container.addChild(this.bg);
+    this.container.addChild(this.dynamic);
+
+    this.buildBackground(map);
+    this.updatePosition();
+  }
+
+  rebuild(map: WorldMap) {
+    this.buildBackground(map);
+    this.updatePosition();
+  }
+
+  private buildBackground(map: WorldMap) {
+    this.mapCols = map.cols;
+    this.mapRows = map.rows;
+    const mmW = this.mapCols * MM_SCALE;
+    const mmH = this.mapRows * MM_SCALE;
+
+    this.bg.clear();
     this.bg.beginFill(0x000000, 0.5);
-    this.bg.drawRoundedRect(-2, -2, MM_W + 4, MM_H + 4, 3);
+    this.bg.drawRoundedRect(-2, -2, mmW + 4, mmH + 4, 3);
     this.bg.endFill();
 
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
+    for (let r = 0; r < this.mapRows; r++) {
+      for (let c = 0; c < this.mapCols; c++) {
         const tile = map.data[r][c];
         if (tile === TILE.WALL) {
           this.bg.beginFill(0x666666);
         } else if (tile === TILE.BOSS_FLOOR) {
           this.bg.beginFill(0x331144);
+        } else if (tile === TILE.STAIRS) {
+          this.bg.beginFill(0x44ddaa);
         } else {
           this.bg.beginFill(0x224422);
         }
@@ -37,17 +58,11 @@ export class Minimap {
         this.bg.endFill();
       }
     }
-    this.container.addChild(this.bg);
-
-    // Dynamic layer (player, enemies, boss)
-    this.dynamic = new Graphics();
-    this.container.addChild(this.dynamic);
-
-    this.updatePosition();
   }
 
   private updatePosition() {
-    this.container.x = this.screenW - MM_W - MARGIN;
+    const mmW = this.mapCols * MM_SCALE;
+    this.container.x = this.screenW - mmW - MARGIN;
     this.container.y = MARGIN;
   }
 
@@ -60,7 +75,7 @@ export class Minimap {
     const g = this.dynamic;
     g.clear();
 
-    const TILE_SIZE = 48; // avoid circular import
+    const TILE_SIZE = 48;
 
     // Enemies as red dots
     for (const e of enemies) {
