@@ -11,10 +11,10 @@ export class RangedEnemy extends Enemy {
   private readonly projectileColor: number;
 
   constructor(
-    x: number, y: number, hp = 120, speed = 60, damage = 12,
+    x: number, y: number, hp = 120, speed = 60, damage = 24,
     xpReward = 30,
     shootInterval = 2.2, shootRange = 280,
-    projectileDmg = 18, projectileColor = 0x00ccff,
+    projectileDmg = 36, projectileColor = 0x00ccff,
   ) {
     super(x, y, hp, speed, damage, 40, xpReward, 36, 36);
     this.shootInterval = shootInterval;

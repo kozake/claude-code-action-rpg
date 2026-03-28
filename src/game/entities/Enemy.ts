@@ -67,8 +67,20 @@ export class Enemy {
     this.stunTime = 0.2;
   }
 
+  /** If the enemy is somehow inside a wall, push them to nearest open space. */
+  protected escapeWall(map: WorldMap) {
+    if (!map.isColliding(this.x, this.y, this.w, this.h)) return;
+    const step = 6;
+    for (const [ex, ey] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] as [number,number][]) {
+      if (!map.isColliding(this.x + ex * step, this.y + ey * step, this.w, this.h)) {
+        this.x += ex * step; this.y += ey * step; return;
+      }
+    }
+  }
+
   /** Check if enemy hit a wall during knockback. Returns true if wall collision. */
   updateKnockback(dt: number, map: WorldMap): boolean {
+    this.escapeWall(map);
     let hitWall = false;
     if (Math.abs(this.kbVx) > 1 || Math.abs(this.kbVy) > 1) {
       const nx = this.x + this.kbVx * dt;

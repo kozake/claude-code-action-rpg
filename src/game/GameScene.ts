@@ -34,57 +34,57 @@ const WAVES: WaveDef[] = [
   {
     message: '⚔ Wave 1: 前哨戦',
     enemies: [
-      [14, 5, 'basic', 120, 82], [22, 8, 'basic', 115, 88],
-      [9, 14, 'basic', 130, 82], [34, 4, 'basic', 120, 92],
-      [27, 17, 'basic', 125, 78], [5, 8, 'basic', 110, 88],
-      [40, 12, 'basic', 120, 84], [18, 20, 'basic', 115, 88],
-      [45, 5, 'basic', 110, 92], [30, 25, 'basic', 130, 82],
+      [14, 5, 'basic', 240, 94], [22, 8, 'basic', 230, 101],
+      [9, 14, 'basic', 260, 94], [34, 4, 'basic', 240, 106],
+      [27, 17, 'basic', 250, 90], [5, 8, 'basic', 220, 101],
+      [40, 12, 'basic', 240, 97], [18, 20, 'basic', 230, 101],
+      [45, 5, 'basic', 220, 106], [30, 25, 'basic', 260, 94],
     ],
   },
   {
     message: '⚔ Wave 2: 遠距離の脅威',
     enemies: [
-      [38, 13, 'ranged', 145, 62], [42, 7, 'ranged', 145, 62],
-      [30, 10, 'ranged', 155, 67], [7, 10, 'ranged', 140, 62],
-      [15, 22, 'ranged', 148, 62], [35, 20, 'ranged', 142, 60],
-      [18, 22, 'basic', 158, 92], [7, 20, 'basic', 165, 88],
-      [46, 18, 'basic', 148, 98], [25, 6, 'basic', 155, 90],
-      [40, 22, 'basic', 150, 92], [12, 6, 'basic', 152, 88],
+      [38, 13, 'ranged', 290, 71], [42, 7, 'ranged', 290, 71],
+      [30, 10, 'ranged', 310, 77], [7, 10, 'ranged', 280, 71],
+      [15, 22, 'ranged', 296, 71], [35, 20, 'ranged', 284, 69],
+      [18, 22, 'basic', 316, 106], [7, 20, 'basic', 330, 101],
+      [46, 18, 'basic', 296, 113], [25, 6, 'basic', 310, 104],
+      [40, 22, 'basic', 300, 106], [12, 6, 'basic', 304, 101],
     ],
   },
   {
     message: '⚔ Wave 3: 突撃部隊',
     enemies: [
-      [15, 6, 'charger', 185, 78], [35, 10, 'charger', 185, 78],
-      [8, 20, 'charger', 178, 82], [42, 18, 'charger', 180, 80],
-      [25, 20, 'bomber', 105, 98], [10, 15, 'bomber', 105, 98],
-      [40, 8, 'bomber', 100, 102], [20, 5, 'bomber', 105, 98],
-      [40, 15, 'ranged', 165, 68], [28, 25, 'ranged', 160, 65],
+      [15, 6, 'charger', 370, 90], [35, 10, 'charger', 370, 90],
+      [8, 20, 'charger', 356, 94], [42, 18, 'charger', 360, 92],
+      [25, 20, 'bomber', 210, 113], [10, 15, 'bomber', 210, 113],
+      [40, 8, 'bomber', 200, 117], [20, 5, 'bomber', 210, 113],
+      [40, 15, 'ranged', 330, 78], [28, 25, 'ranged', 320, 75],
     ],
   },
   {
     message: '⚔ Wave 4: 精鋭部隊',
     enemies: [
-      [20, 10, 'shield', 230, 60], [30, 15, 'shield', 230, 60],
-      [10, 6, 'shield', 220, 58], [44, 12, 'shield', 225, 62],
-      [12, 20, 'summoner', 260, 44], [38, 20, 'summoner', 250, 42],
-      [38, 8, 'charger', 205, 82], [14, 14, 'charger', 200, 80],
-      [25, 5, 'ranged', 180, 68], [45, 20, 'bomber', 120, 102],
-      [6, 14, 'bomber', 115, 100], [30, 22, 'ranged', 175, 65],
+      [20, 10, 'shield', 460, 69], [30, 15, 'shield', 460, 69],
+      [10, 6, 'shield', 440, 67], [44, 12, 'shield', 450, 71],
+      [12, 20, 'summoner', 520, 51], [38, 20, 'summoner', 500, 48],
+      [38, 8, 'charger', 410, 94], [14, 14, 'charger', 400, 92],
+      [25, 5, 'ranged', 360, 78], [45, 20, 'bomber', 240, 117],
+      [6, 14, 'bomber', 230, 115], [30, 22, 'ranged', 350, 75],
     ],
   },
   {
     message: '💀 Final Wave: 総攻撃',
     enemies: [
-      [10, 8, 'charger', 220, 88], [40, 8, 'charger', 220, 88],
-      [8, 20, 'charger', 215, 90], [42, 20, 'charger', 218, 88],
-      [25, 12, 'summoner', 290, 50], [15, 25, 'summoner', 280, 48],
-      [38, 25, 'summoner', 285, 48], [15, 18, 'shield', 260, 65],
-      [35, 18, 'shield', 260, 65], [8, 12, 'shield', 250, 62],
-      [44, 14, 'shield', 255, 64], [20, 24, 'bomber', 135, 108],
-      [30, 24, 'bomber', 135, 108], [8, 5, 'bomber', 128, 110],
-      [44, 5, 'bomber', 130, 108], [42, 22, 'ranged', 205, 70],
-      [12, 22, 'ranged', 200, 70], [28, 8, 'ranged', 200, 70],
+      [10, 8, 'charger', 440, 101], [40, 8, 'charger', 440, 101],
+      [8, 20, 'charger', 430, 104], [42, 20, 'charger', 436, 101],
+      [25, 12, 'summoner', 580, 58], [15, 25, 'summoner', 560, 55],
+      [38, 25, 'summoner', 570, 55], [15, 18, 'shield', 520, 75],
+      [35, 18, 'shield', 520, 75], [8, 12, 'shield', 500, 71],
+      [44, 14, 'shield', 510, 74], [20, 24, 'bomber', 270, 124],
+      [30, 24, 'bomber', 270, 124], [8, 5, 'bomber', 256, 127],
+      [44, 5, 'bomber', 260, 124], [42, 22, 'ranged', 410, 81],
+      [12, 22, 'ranged', 400, 81], [28, 8, 'ranged', 400, 81],
     ],
   },
 ];
@@ -249,8 +249,7 @@ export class GameScene {
     this.hud.showWave(index + 1, WAVES.length);
 
     for (const [tc, tr, type, hp, spd] of wave.enemies) {
-      const px = tc * TILE_SIZE + TILE_SIZE / 2;
-      const py = tr * TILE_SIZE + TILE_SIZE / 2;
+      const { x: px, y: py } = this.map.findSafeSpawn(tc, tr);
       const e = this.createEnemy(type, px, py, hp, spd);
       this.enemies.push(e);
       this.world.addChild(e.container);
@@ -265,7 +264,7 @@ export class GameScene {
       case 'shield': return new ShieldEnemy(x, y, hp, spd);
       case 'summoner': return new SummonerEnemy(x, y, hp, spd);
       default: {
-        return new Enemy(x, y, hp, spd, 20, 38, 20, 36, 36);
+        return new Enemy(x, y, hp, spd, 40, 38, 20, 36, 36);
       }
     }
   }
@@ -369,7 +368,9 @@ export class GameScene {
       // Handle summoner spawning
       if (enemy instanceof SummonerEnemy && (enemy as SummonerEnemy).pendingSummon) {
         (enemy as SummonerEnemy).pendingSummon = false;
-        const minion = this.createEnemy('basic', enemy.x + 30, enemy.y + 30, 60, 90);
+        const mc = Math.floor((enemy.x + 30) / TILE_SIZE), mr = Math.floor((enemy.y + 30) / TILE_SIZE);
+        const { x: mx, y: my } = this.map.findSafeSpawn(mc, mr);
+        const minion = this.createEnemy('basic', mx, my, 120, 104);
         this.enemies.push(minion);
         this.world.addChild(minion.container);
         this.particles.emit(enemy.x, enemy.y, 8, 0xcc44ff, 100, 200, 0.3, 0.2, 3);
