@@ -469,4 +469,50 @@ export class AudioManager {
       osc.stop(t + i * 0.08 + 0.15);
     }
   }
+
+  /** Stairs discovered / floor clear jingle */
+  playSfxStairs() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    const notes = [523, 659, 784, 1047, 1319]; // C5, E5, G5, C6, E6
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const env = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = notes[i];
+      env.gain.setValueAtTime(0, t + i * 0.1);
+      env.gain.linearRampToValueAtTime(0.25, t + i * 0.1 + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 0.2);
+      osc.connect(env);
+      env.connect(this.sfxGain);
+      osc.start(t + i * 0.1);
+      osc.stop(t + i * 0.1 + 0.2);
+    }
+  }
+
+  /** Floor transition whoosh */
+  playSfxFloorTransition() {
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
+    // Deep sweep
+    this.playNoise(0.5, 0.3, 200, 40, 'sawtooth');
+    // High whoosh
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.4);
+    env.gain.setValueAtTime(0.15, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(env);
+    env.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  }
+
+  /** Dash SFX */
+  playSfxDash() {
+    if (!this.ctx || !this.sfxGain) return;
+    this.playNoise(0.08, 0.2, 800, 200, 'sawtooth');
+  }
 }

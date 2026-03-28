@@ -25,6 +25,7 @@ export class HUD {
   private comboScale = 1;
 
   private waveText: Text;
+  private floorText: Text;
   private buffText: Text;
 
   private screenW: number;
@@ -86,13 +87,21 @@ export class HUD {
     });
     this.waveText.x = 14; this.waveText.y = 72;
 
+    // ── Floor indicator ────────────────────────────────────────────────────────
+    this.floorText = new Text('B1F', {
+      fontSize: 13, fill: 0xffcc66, fontWeight: 'bold',
+      stroke: 0x000000, strokeThickness: 3,
+      fontFamily: 'Arial, sans-serif',
+    });
+    this.floorText.x = 14; this.floorText.y = 88;
+
     // ── Buff indicator ────────────────────────────────────────────────────────
     this.buffText = new Text('', {
       fontSize: 11, fill: 0xffdd44,
       stroke: 0x000000, strokeThickness: 2,
       fontFamily: 'Arial, sans-serif',
     });
-    this.buffText.x = 14; this.buffText.y = 88;
+    this.buffText.x = 14; this.buffText.y = 104;
 
     // ── Message text ──────────────────────────────────────────────────────────
     this.msgText = new Text('', {
@@ -114,6 +123,7 @@ export class HUD {
     this.container.addChild(this.xpBar);
     this.container.addChild(this.levelText);
     this.container.addChild(this.waveText);
+    this.container.addChild(this.floorText);
     this.container.addChild(this.buffText);
     this.container.addChild(this.bossPanel);
     this.container.addChild(this.comboText);
@@ -307,6 +317,10 @@ export class HUD {
 
   showWave(current: number, total: number) {
     this.waveText.text = `Wave ${current}/${total}`;
+  }
+
+  showFloor(floorNumber: number, totalFloors: number) {
+    this.floorText.text = `B${floorNumber}F / ${totalFloors}F`;
   }
 
   showMessage(text: string, duration = 3) {
