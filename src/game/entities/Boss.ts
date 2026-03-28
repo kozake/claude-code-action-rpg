@@ -24,8 +24,15 @@ export class Boss extends Enemy {
   private auraGfx: Graphics;
   private crownGfx: Graphics;
 
+  // Dash attack
+  private dashCooldown = 0;
+  private dashActive = false;
+  private dashVx = 0;
+  private dashVy = 0;
+  private dashTimer = 0;
+
   constructor(x: number, y: number) {
-    super(x, y, 4500, 70, 50, 60, 500, 64, 64);
+    super(x, y, 7000, 85, 50, 75, 500, 64, 64);
 
     this.crownGfx = new Graphics();
     this.container.addChild(this.crownGfx);
@@ -49,12 +56,12 @@ export class Boss extends Enemy {
     // Phase transitions
     if (!this.isAngry && this.hp < this.maxHp * 0.6) {
       this.isAngry = true; this.phase = 2;
-      this.speed = 130; this.damage = 80; this.shotInterval = 1.5;
+      this.speed = 155; this.damage = 100; this.shotInterval = 1.2;
       this.phaseTransitioned = true;
     }
     if (!this.isEnraged && this.hp < this.maxHp * 0.35) {
       this.isEnraged = true; this.phase = 3;
-      this.speed = 165; this.damage = 115; this.shotInterval = 0.9;
+      this.speed = 190; this.damage = 140; this.shotInterval = 0.7;
       this.phase3Transitioned = true;
     }
 
@@ -86,7 +93,7 @@ export class Boss extends Enemy {
 
     if (dist < this.attackRange && this.attackCooldown <= 0) {
       player.takeDamage(this.damage);
-      this.attackCooldown = this.isEnraged ? 0.5 : this.isAngry ? 0.8 : 1.2;
+      this.attackCooldown = this.isEnraged ? 0.35 : this.isAngry ? 0.6 : 1.0;
     }
 
     if (fire && this.shotCooldown <= 0) {
@@ -100,37 +107,74 @@ export class Boss extends Enemy {
       }
     }
 
+    // Dash attack (Phase 2+)
+    this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+    if (this.dashActive) {
+      this.dashTimer -= dt;
+      const ds = (this.isEnraged ? 550 : 420) * dt;
+      const mx = this.dashVx * ds;
+      const my = this.dashVy * ds;
+      if (!map.isColliding(this.x + mx, this.y, this.w, this.h)) this.x += mx;
+      if (!map.isColliding(this.x, this.y + my, this.w, this.h)) this.y += my;
+      // Deal damage on contact during dash
+      const ddx = player.x - this.x, ddy = player.y - this.y;
+      if (ddx * ddx + ddy * ddy < (this.w + player.w) * (this.w + player.w) * 0.5) {
+        player.takeDamage(Math.round(this.damage * 1.5));
+      }
+      if (this.dashTimer <= 0) {
+        this.dashActive = false;
+        this.dashCooldown = this.isEnraged ? 2.5 : 4.0;
+      }
+    } else if ((this.isAngry || this.isEnraged) && this.dashCooldown <= 0 && dist > 150 && dist < 600) {
+      // Initiate dash toward player
+      this.dashActive = true;
+      this.dashTimer = 0.35;
+      this.dashVx = dx / dist;
+      this.dashVy = dy / dist;
+      this.dashCooldown = this.isEnraged ? 2.5 : 4.0;
+    }
+
     this.syncGfx();
   }
 
   private fireProjectiles(dx: number, dy: number, dist: number, fire: FireFn) {
     const ba = Math.atan2(dy, dx);
-    const ps = 240;
+    const ps = 270;
     if (this.isEnraged) {
-      // 12-way omnidirectional burst
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        fire(this.x, this.y, Math.cos(a) * ps, Math.sin(a) * ps, 40, 0xff00ff, 9);
+      // 16-way omnidirectional burst
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        fire(this.x, this.y, Math.cos(a) * ps, Math.sin(a) * ps, 45, 0xff00ff, 9);
       }
-      // 5-shot targeted spread
-      const sp = 0.32;
-      for (let i = -2; i <= 2; i++) {
-        const a = ba + i * sp;
-        fire(this.x, this.y, Math.cos(a) * (ps + 40), Math.sin(a) * (ps + 40), 45, 0xff3300, 10);
-      }
-    } else if (this.isAngry) {
-      // 7-shot spread
-      const sp = 0.26;
+      // 7-shot targeted spread
+      const sp = 0.24;
       for (let i = -3; i <= 3; i++) {
         const a = ba + i * sp;
-        fire(this.x, this.y, Math.cos(a) * ps, Math.sin(a) * ps, 32, 0xff6600, 9);
+        fire(this.x, this.y, Math.cos(a) * (ps + 50), Math.sin(a) * (ps + 50), 50, 0xff3300, 10);
+      }
+      // Secondary delayed ring (offset angle)
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2 + Math.PI / 16;
+        fire(this.x, this.y, Math.cos(a) * (ps * 0.7), Math.sin(a) * (ps * 0.7), 35, 0xcc00cc, 8);
+      }
+    } else if (this.isAngry) {
+      // 9-shot spread
+      const sp = 0.22;
+      for (let i = -4; i <= 4; i++) {
+        const a = ba + i * sp;
+        fire(this.x, this.y, Math.cos(a) * ps, Math.sin(a) * ps, 35, 0xff6600, 9);
+      }
+      // 8-way burst behind
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        fire(this.x, this.y, Math.cos(a) * (ps * 0.65), Math.sin(a) * (ps * 0.65), 28, 0xff4400, 7);
       }
     } else {
-      // 5-shot spread
-      const sp = 0.22;
-      for (let i = -2; i <= 2; i++) {
+      // 7-shot spread
+      const sp = 0.2;
+      for (let i = -3; i <= 3; i++) {
         const a = ba + i * sp;
-        fire(this.x, this.y, Math.cos(a) * ps * 0.9, Math.sin(a) * ps * 0.9, 25, 0xff8800, 8);
+        fire(this.x, this.y, Math.cos(a) * ps * 0.85, Math.sin(a) * ps * 0.85, 28, 0xff8800, 8);
       }
     }
   }
