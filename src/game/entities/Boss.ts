@@ -45,7 +45,7 @@ export class Boss extends Enemy {
   }
 
   update(dt: number, player: Player, map: WorldMap, fire?: FireFn) {
-    if (this.dead) return;
+    if (this.dead) { super.update(dt, player, map); return; }
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.shotCooldown = Math.max(0, this.shotCooldown - dt);
