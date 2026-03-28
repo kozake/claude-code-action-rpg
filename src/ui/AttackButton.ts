@@ -19,7 +19,6 @@ export class AttackButton {
   private screenW = 0;
   private screenH = 0;
 
-  // Positions relative to screen
   private attackX = 0;
   private attackY = 0;
   private skillX = 0;
@@ -32,14 +31,14 @@ export class AttackButton {
     this.skillGfx = new Graphics();
 
     this.attackLabel = new Text('⚔', {
-      fontSize: 28,
-      fill: 0xffffff,
+      fontSize: 26, fill: 0xffffff,
+      stroke: 0x000000, strokeThickness: 3,
     });
     this.attackLabel.anchor.set(0.5);
 
     this.skillLabel = new Text('💨', {
-      fontSize: 20,
-      fill: 0xffffff,
+      fontSize: 19, fill: 0xffffff,
+      stroke: 0x000000, strokeThickness: 2,
     });
     this.skillLabel.anchor.set(0.5);
 
@@ -59,11 +58,9 @@ export class AttackButton {
     this.screenW = screenW;
     this.screenH = screenH;
 
-    // Attack button: bottom-right
     this.attackX = screenW - 90;
     this.attackY = screenH - 100;
 
-    // Skill button: above and left of attack button
     this.skillX = screenW - 170;
     this.skillY = screenH - 155;
 
@@ -78,25 +75,56 @@ export class AttackButton {
 
   private drawAttack(active: boolean) {
     this.attackGfx.clear();
-    this.attackGfx.beginFill(active ? 0xff6666 : 0xcc2222, active ? 0.95 : 0.75);
-    this.attackGfx.drawCircle(this.attackX, this.attackY, BTN_R);
+    const cx = this.attackX, cy = this.attackY;
+
+    // Outer glow
+    this.attackGfx.beginFill(active ? 0xff4444 : 0xaa1111, active ? 0.35 : 0.2);
+    this.attackGfx.drawCircle(cx, cy, BTN_R + 8);
     this.attackGfx.endFill();
-    this.attackGfx.lineStyle(3, 0xff9999, 0.6);
-    this.attackGfx.drawCircle(this.attackX, this.attackY, BTN_R);
+
+    // Main button body
+    this.attackGfx.beginFill(active ? 0xee3333 : 0xbb1122, active ? 0.92 : 0.78);
+    this.attackGfx.drawCircle(cx, cy, BTN_R);
+    this.attackGfx.endFill();
+
+    // Inner highlight arc (top)
+    this.attackGfx.beginFill(0xffffff, active ? 0.2 : 0.28);
+    this.attackGfx.drawEllipse(cx, cy - BTN_R * 0.32, BTN_R * 0.72, BTN_R * 0.3);
+    this.attackGfx.endFill();
+
+    // Border
+    this.attackGfx.lineStyle(2, active ? 0xff9999 : 0xdd4444, active ? 0.7 : 0.5);
+    this.attackGfx.drawCircle(cx, cy, BTN_R);
+    this.attackGfx.lineStyle(0);
   }
 
   private drawSkill(active: boolean) {
     this.skillGfx.clear();
-    this.skillGfx.beginFill(active ? 0x88aaff : 0x3355aa, active ? 0.95 : 0.75);
-    this.skillGfx.drawCircle(this.skillX, this.skillY, SKILL_R);
+    const cx = this.skillX, cy = this.skillY;
+
+    // Outer glow
+    this.skillGfx.beginFill(active ? 0x4488ff : 0x2244aa, active ? 0.3 : 0.18);
+    this.skillGfx.drawCircle(cx, cy, SKILL_R + 7);
     this.skillGfx.endFill();
-    this.skillGfx.lineStyle(2, 0xaabbff, 0.6);
-    this.skillGfx.drawCircle(this.skillX, this.skillY, SKILL_R);
+
+    // Main button body
+    this.skillGfx.beginFill(active ? 0x4477ee : 0x2255bb, active ? 0.9 : 0.75);
+    this.skillGfx.drawCircle(cx, cy, SKILL_R);
+    this.skillGfx.endFill();
+
+    // Highlight
+    this.skillGfx.beginFill(0xffffff, active ? 0.18 : 0.25);
+    this.skillGfx.drawEllipse(cx, cy - SKILL_R * 0.3, SKILL_R * 0.65, SKILL_R * 0.28);
+    this.skillGfx.endFill();
+
+    // Border
+    this.skillGfx.lineStyle(1.5, active ? 0x99ccff : 0x5577cc, active ? 0.7 : 0.5);
+    this.skillGfx.drawCircle(cx, cy, SKILL_R);
+    this.skillGfx.lineStyle(0);
   }
 
   private onTouchStart = (e: TouchEvent) => {
     for (const t of Array.from(e.changedTouches)) {
-      // Attack button
       if (this.attackTouchId === null) {
         const dx = t.clientX - this.attackX;
         const dy = t.clientY - this.attackY;
@@ -107,7 +135,6 @@ export class AttackButton {
           continue;
         }
       }
-      // Skill button
       if (this.skillTouchId === null) {
         const dx = t.clientX - this.skillX;
         const dy = t.clientY - this.skillY;

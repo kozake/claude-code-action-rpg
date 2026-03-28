@@ -1,4 +1,4 @@
-import { Graphics, Container, Sprite, Texture } from 'pixi.js';
+import { Graphics, Container } from 'pixi.js';
 import type { Player } from './Player';
 import type { WorldMap } from '../maps/WorldMap';
 
@@ -24,7 +24,7 @@ export class Enemy {
   kbVy = 0;
   stunTime = 0;
 
-  protected sprite: Sprite;
+  protected bodyGfx: Graphics;
   protected hpBarGfx: Graphics;
   readonly shadowGfx: Graphics;
   readonly container: Container;
@@ -33,7 +33,6 @@ export class Enemy {
   constructor(
     x: number, y: number, hp = 100, speed = 85, damage = 18,
     attackRange = 36, xpReward = 20, w = 36, h = 36,
-    spriteUrl = './images/enemy1.png',
   ) {
     this.x = x; this.y = y; this.hp = hp; this.maxHp = hp;
     this.speed = speed; this.damage = damage;
@@ -42,14 +41,19 @@ export class Enemy {
     this.floatTimer = Math.random() * Math.PI * 2;
 
     this.container = new Container();
+
+    // Shadow
     this.shadowGfx = new Graphics();
     this.container.addChild(this.shadowGfx);
-    this.sprite = new Sprite(Texture.from(spriteUrl));
-    this.sprite.anchor.set(0.5);
-    this.sprite.width = w; this.sprite.height = h;
-    this.container.addChild(this.sprite);
+
+    // Body (procedural graphics)
+    this.bodyGfx = new Graphics();
+    this.container.addChild(this.bodyGfx);
+
+    // HP bar (always on top of body)
     this.hpBarGfx = new Graphics();
     this.container.addChild(this.hpBarGfx);
+
     this.render();
   }
 
@@ -120,31 +124,118 @@ export class Enemy {
     if (this.hp <= 0) { this.hp = 0; this.dead = true; this.container.visible = false; }
   }
 
+  /** Draw the enemy body. Subclasses override to customize appearance. */
+  protected drawBody(g: Graphics, isHit: boolean) {
+    if (isHit) {
+      g.beginFill(0xffffff, 0.95);
+      g.drawEllipse(0, 0, this.w * 0.45, this.h * 0.5);
+      g.drawCircle(0, -this.h * 0.38, this.w * 0.3);
+      g.endFill();
+      return;
+    }
+    this.drawDemonBody(g, 0xaa1a1a, 0xdd3333, 0xff5544);
+  }
+
+  /** Generic demon body helper used by subclasses */
+  protected drawDemonBody(
+    g: Graphics,
+    bodyColor: number,
+    highlightColor: number,
+    eyeColor: number,
+  ) {
+    const hw = this.w * 0.44;
+    const hh = this.h * 0.5;
+
+    // Body oval
+    g.beginFill(bodyColor);
+    g.drawEllipse(0, 2, hw, hh);
+    g.endFill();
+
+    // Body highlight (left side sheen)
+    g.beginFill(highlightColor, 0.45);
+    g.drawEllipse(-hw * 0.25, 0, hw * 0.4, hh * 0.7);
+    g.endFill();
+
+    // Head
+    g.beginFill(bodyColor);
+    g.drawCircle(0, -hh * 0.62, hw * 0.6);
+    g.endFill();
+
+    // Head sheen
+    g.beginFill(highlightColor, 0.35);
+    g.drawCircle(-hw * 0.18, -hh * 0.72, hw * 0.28);
+    g.endFill();
+
+    // Horns
+    const hornX = hw * 0.38;
+    const hornY = -hh * 0.9;
+    g.beginFill(bodyColor);
+    g.drawPolygon([-hornX, hornY + 4, -hornX - 4, hornY - 10, -hornX + 4, hornY + 2]);
+    g.drawPolygon([hornX, hornY + 4, hornX - 4, hornY + 2, hornX + 4, hornY - 10]);
+    g.endFill();
+    // Horn tips (slightly lighter)
+    g.beginFill(highlightColor, 0.5);
+    g.drawPolygon([-hornX - 2, hornY - 4, -hornX - 4, hornY - 10, -hornX + 2, hornY - 4]);
+    g.drawPolygon([hornX + 2, hornY - 4, hornX + 4, hornY - 10, hornX - 2, hornY - 4]);
+    g.endFill();
+
+    // Eyes (glowing)
+    const eyeY = -hh * 0.68;
+    const eyeX = hw * 0.22;
+    // Glow halo
+    g.beginFill(eyeColor, 0.3);
+    g.drawCircle(-eyeX, eyeY, 5);
+    g.drawCircle(eyeX, eyeY, 5);
+    g.endFill();
+    // Eye whites
+    g.beginFill(eyeColor);
+    g.drawCircle(-eyeX, eyeY, 3.5);
+    g.drawCircle(eyeX, eyeY, 3.5);
+    g.endFill();
+    // Pupils
+    g.beginFill(0x110000);
+    g.drawCircle(-eyeX + 0.8, eyeY + 0.5, 1.8);
+    g.drawCircle(eyeX + 0.8, eyeY + 0.5, 1.8);
+    g.endFill();
+
+    // Claws / feet hint at bottom
+    g.beginFill(bodyColor);
+    g.drawEllipse(-hw * 0.35, hh * 0.75, hw * 0.2, hw * 0.12);
+    g.drawEllipse(hw * 0.35, hh * 0.75, hw * 0.2, hw * 0.12);
+    g.endFill();
+  }
+
   protected render() {
     const hpRatio = this.hp / this.maxHp;
+    const floatY = Math.sin(this.floatTimer) * 2;
+
+    // Shadow
     this.shadowGfx.clear();
-    this.shadowGfx.beginFill(0x000000, 0.3);
-    this.shadowGfx.drawEllipse(0, this.h / 2 - 4, this.w * 0.4, 5);
+    this.shadowGfx.beginFill(0x000000, 0.28);
+    this.shadowGfx.drawEllipse(0, this.h * 0.5 - 3, this.w * 0.38, 5);
     this.shadowGfx.endFill();
 
-    const floatY = Math.sin(this.floatTimer) * 2;
-    this.sprite.y = floatY - 2;
+    // Animate body position vertically (float)
+    this.bodyGfx.y = floatY - 2;
+    this.bodyGfx.clear();
+    this.drawBody(this.bodyGfx, this.hitFlash > 0);
 
-    if (this.hitFlash > 0) {
-      this.sprite.tint = 0xffffff; this.sprite.alpha = 0.8;
-    } else {
-      this.sprite.tint = 0xffffff; this.sprite.alpha = 1.0;
-    }
-
+    // HP bar
     this.hpBarGfx.clear();
     if (hpRatio < 1) {
-      const bw = this.w + 4, bh = 5, bx = -bw / 2, by = -this.h / 2 - 12;
-      this.hpBarGfx.beginFill(0x220000);
-      this.hpBarGfx.drawRect(bx, by, bw, bh);
+      const bw = this.w + 6, bh = 5, bx = -bw / 2, by = -this.h * 0.5 - 14;
+      // Background track
+      this.hpBarGfx.beginFill(0x111111, 0.7);
+      this.hpBarGfx.drawRoundedRect(bx - 1, by - 1, bw + 2, bh + 2, 3);
       this.hpBarGfx.endFill();
-      const fc = hpRatio > 0.5 ? 0x44dd44 : hpRatio > 0.25 ? 0xffcc00 : 0xff3333;
+      // Fill
+      const fc = hpRatio > 0.5 ? 0x33ee55 : hpRatio > 0.25 ? 0xffcc00 : 0xff3322;
       this.hpBarGfx.beginFill(fc);
-      this.hpBarGfx.drawRect(bx, by, bw * hpRatio, bh);
+      this.hpBarGfx.drawRoundedRect(bx, by, bw * hpRatio, bh, 2);
+      this.hpBarGfx.endFill();
+      // Top sheen
+      this.hpBarGfx.beginFill(0xffffff, 0.25);
+      this.hpBarGfx.drawRoundedRect(bx, by, bw * hpRatio, 2, 1);
       this.hpBarGfx.endFill();
     }
   }

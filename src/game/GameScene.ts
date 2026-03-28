@@ -21,7 +21,7 @@ import type { Skill } from './Skills';
 
 type GameState = 'title' | 'playing' | 'skill_select' | 'gameover' | 'win';
 
-const ENEMY_SPRITES = ['./images/enemy1.png', './images/enemy2.png', './images/enemy3.png'];
+// Enemy sprite URLs no longer used (procedural rendering)
 
 // Wave definitions: [tileCol, tileRow, type, hp, speed]
 type EnemyType = 'basic' | 'ranged' | 'charger' | 'bomber' | 'shield' | 'summoner';
@@ -250,8 +250,7 @@ export class GameScene {
       case 'shield': return new ShieldEnemy(x, y, hp, spd);
       case 'summoner': return new SummonerEnemy(x, y, hp, spd);
       default: {
-        const si = Math.floor(Math.random() * ENEMY_SPRITES.length);
-        return new Enemy(x, y, hp, spd, 20, 38, 20, 36, 36, ENEMY_SPRITES[si]);
+        return new Enemy(x, y, hp, spd, 20, 38, 20, 36, 36);
       }
     }
   }

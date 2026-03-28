@@ -90,11 +90,19 @@ export class ParticleSystem {
       if (p.life <= 0) return false;
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.vx *= 1 - dt * 3; p.vy += p.gravity * dt;
-      const alpha = (p.life / p.maxLife) * 0.9;
-      const size = p.size * (p.life / p.maxLife);
+      const lifeRatio = p.life / p.maxLife;
+      const alpha = lifeRatio * 0.92;
+      const size = p.size * lifeRatio;
+      // Draw circle particles (smooth, no squares)
       this.gfx.beginFill(p.color, alpha);
-      this.gfx.drawRect(p.x - size / 2, p.y - size / 2, size, size);
+      this.gfx.drawCircle(p.x, p.y, size * 0.65);
       this.gfx.endFill();
+      // Small white core for sparkle effect
+      if (lifeRatio > 0.5 && size > 2) {
+        this.gfx.beginFill(0xffffff, alpha * 0.4);
+        this.gfx.drawCircle(p.x, p.y, size * 0.22);
+        this.gfx.endFill();
+      }
       return true;
     });
 

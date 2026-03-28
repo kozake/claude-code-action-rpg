@@ -1,4 +1,4 @@
-import { Graphics, RenderTexture, Sprite, Container, Texture } from 'pixi.js';
+import { Graphics, RenderTexture, Sprite, Container } from 'pixi.js';
 import type { Renderer } from 'pixi.js';
 
 export const TILE_SIZE = 48;
@@ -106,18 +106,35 @@ export class WorldMap {
 
   private drawBarrel(g: Graphics, damaged = false) {
     g.clear();
-    const c = damaged ? 0x664422 : 0x885533;
-    g.beginFill(c);
-    g.drawRoundedRect(-12, -14, 24, 28, 4);
+    // Shadow
+    g.beginFill(0x000000, 0.25);
+    g.drawEllipse(0, 14, 12, 4);
     g.endFill();
-    // Bands
-    g.lineStyle(2, 0x444444);
-    g.moveTo(-12, -6); g.lineTo(12, -6);
-    g.moveTo(-12, 6); g.lineTo(12, 6);
-    // Highlight
-    g.beginFill(0xaa7744, 0.4);
-    g.drawRect(-8, -12, 6, 22);
+    // Barrel body
+    const bodyColor = damaged ? 0x7a4a20 : 0xa06028;
+    g.beginFill(bodyColor);
+    g.drawRoundedRect(-11, -14, 22, 28, 5);
     g.endFill();
+    // Wood highlight (left side)
+    g.beginFill(damaged ? 0x8a5525 : 0xc07838, 0.5);
+    g.drawRoundedRect(-9, -12, 7, 22, 3);
+    g.endFill();
+    // Metal bands
+    g.beginFill(damaged ? 0x2a2a2a : 0x3a3a3a);
+    g.drawRoundedRect(-11, -5, 22, 4, 1);
+    g.drawRoundedRect(-11, 5, 22, 4, 1);
+    g.endFill();
+    // Band highlight
+    g.beginFill(0x666666, 0.4);
+    g.drawRect(-11, -5, 22, 1);
+    g.drawRect(-11, 5, 22, 1);
+    g.endFill();
+    if (damaged) {
+      // Crack lines
+      g.lineStyle(1.5, 0x3a2010, 0.8);
+      g.moveTo(-4, -8); g.lineTo(2, 2);
+      g.moveTo(3, -6); g.lineTo(1, 4);
+    }
   }
 
   /** Damage a destructible at world position. Returns broken destructible or null. */
@@ -161,14 +178,25 @@ export class WorldMap {
     this.torchGlowTimer += dt;
     for (let i = 0; i < this.torchGlows.length; i++) {
       const g = this.torchGlows[i];
-      const flicker = Math.sin(this.torchGlowTimer * 3 + i * 1.7) * 0.5 + 0.5;
-      const r = 40 + flicker * 20;
+      const flicker = Math.sin(this.torchGlowTimer * 4 + i * 1.7) * 0.5 + 0.5;
+      const flicker2 = Math.sin(this.torchGlowTimer * 6.3 + i * 0.9) * 0.3 + 0.7;
+      const r = 44 + flicker * 22;
       g.clear();
-      g.beginFill(0xffaa33, 0.06 + flicker * 0.04);
+      // Outer warm glow
+      g.beginFill(0xff8800, 0.03 + flicker * 0.04);
+      g.drawCircle(0, 0, r * 1.4);
+      g.endFill();
+      // Main glow
+      g.beginFill(0xff9922, 0.07 + flicker * 0.05);
       g.drawCircle(0, 0, r);
       g.endFill();
-      g.beginFill(0xffdd66, 0.08 + flicker * 0.05);
-      g.drawCircle(0, 0, r * 0.5);
+      // Inner bright glow
+      g.beginFill(0xffdd44, 0.10 + flicker2 * 0.06);
+      g.drawCircle(0, 0, r * 0.45);
+      g.endFill();
+      // Core flame
+      g.beginFill(0xffffff, 0.08 + flicker * 0.06);
+      g.drawCircle(0, -2, r * 0.18);
       g.endFill();
     }
     // Update trap timers
@@ -181,19 +209,26 @@ export class WorldMap {
     this.bossRoomLocked = true;
     const g = this.doorBarrier;
     g.clear();
-    g.beginFill(0xcc0000, 0.75);
+    // Barrier fill
+    g.beginFill(0x880000, 0.6);
     g.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
     g.endFill();
-    g.lineStyle(3, 0xff4444, 0.9);
-    for (let i = 0; i <= 3; i++) {
+    // Energy field lines
+    g.lineStyle(3, 0xff2222, 0.85);
+    for (let i = 0; i < 4; i++) {
       const x = (23 + i) * TILE_SIZE;
       g.moveTo(x, 29 * TILE_SIZE);
       g.lineTo(x + TILE_SIZE, 30 * TILE_SIZE);
       g.moveTo(x + TILE_SIZE, 29 * TILE_SIZE);
       g.lineTo(x, 30 * TILE_SIZE);
     }
-    g.lineStyle(2, 0xff8800, 1);
+    // Outer border glow
+    g.lineStyle(2, 0xff6600, 0.9);
     g.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
+    // Top shimmer
+    g.lineStyle(1, 0xffaa44, 0.5);
+    g.moveTo(23 * TILE_SIZE, 29 * TILE_SIZE + 3);
+    g.lineTo(26 * TILE_SIZE, 29 * TILE_SIZE + 3);
   }
 
   unlockBossRoom() {
@@ -247,74 +282,216 @@ export class WorldMap {
     return m;
   }
 
-  private renderToTexture(renderer: Renderer) {
-    const floorTextures = [
-      Texture.from('./images/floor0.png'),
-      Texture.from('./images/floor1.png'),
-      Texture.from('./images/floor2.png'),
-    ];
-    const wallTex = Texture.from('./images/wall.png');
-    const bossTex = Texture.from('./images/boss_floor.png');
-    const torchTex = Texture.from('./images/torch.png');
+  // ── Procedural tile drawing helpers ────────────────────────────────────────
 
+  private drawGrassTile(g: Graphics, x: number, y: number, row: number, col: number) {
+    const v = (row * 7 + col * 13 + row * col) % 3;
+    const bases = [0x2e6336, 0x2a5c30, 0x336b3a];
+    g.beginFill(bases[v]);
+    g.drawRect(x, y, TILE_SIZE, TILE_SIZE);
+    g.endFill();
+    // Darker grass patches
+    if ((row * 3 + col * 7) % 5 === 0) {
+      g.beginFill(0x1d4725, 0.35);
+      const px = x + ((row * 13 + col * 7) % 28) + 4;
+      const py = y + ((row * 7 + col * 11) % 26) + 4;
+      g.drawRoundedRect(px, py, 7, 6, 2);
+      g.endFill();
+    }
+    // Lighter highlight patches
+    if ((row * 5 + col * 11) % 7 === 0) {
+      g.beginFill(0x4e9458, 0.2);
+      const px = x + ((row * 11 + col * 5) % 30) + 4;
+      const py = y + ((row * 9 + col * 13) % 24) + 4;
+      g.drawRoundedRect(px, py, 5, 9, 2);
+      g.endFill();
+    }
+    // Subtle edge darken at bottom for faux-depth
+    g.beginFill(0x000000, 0.06);
+    g.drawRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+    g.endFill();
+  }
+
+  private drawWallTile(g: Graphics, x: number, y: number, row: number, col: number) {
+    // Base stone fill
+    g.beginFill(0x3e3e52);
+    g.drawRect(x, y, TILE_SIZE, TILE_SIZE);
+    g.endFill();
+
+    // Brick pattern – alternating rows
+    const brickH = 16, brickW = 25;
+    for (let by = 0; by * brickH < TILE_SIZE + brickH; by++) {
+      const offset = (by % 2 === 0) ? 0 : Math.floor(brickW / 2);
+      for (let bx = -brickW; bx < TILE_SIZE + brickW; bx += brickW) {
+        const bxAbs = x + bx + ((row % 2) * 12) - (offset % brickW);
+        const byAbs = y + by * brickH;
+        const clippedX = Math.max(bxAbs + 1, x);
+        const clippedY = Math.max(byAbs + 1, y);
+        const clippedW = Math.min(bxAbs + brickW - 2, x + TILE_SIZE) - clippedX;
+        const clippedH = Math.min(byAbs + brickH - 2, y + TILE_SIZE) - clippedY;
+        if (clippedW > 1 && clippedH > 1) {
+          // Brick face
+          g.beginFill(0x4c4c62);
+          g.drawRect(clippedX, clippedY, clippedW, clippedH);
+          g.endFill();
+          // Top-left highlight
+          g.beginFill(0x626278, 0.55);
+          g.drawRect(clippedX, clippedY, clippedW, 2);
+          g.drawRect(clippedX, clippedY, 2, clippedH);
+          g.endFill();
+          // Bottom-right shadow
+          g.beginFill(0x28283a, 0.4);
+          g.drawRect(clippedX, clippedY + clippedH - 1, clippedW, 1);
+          g.drawRect(clippedX + clippedW - 1, clippedY, 1, clippedH);
+          g.endFill();
+        }
+      }
+    }
+    // Top cap sheen
+    g.beginFill(0x6a6a84, 0.25);
+    g.drawRect(x, y, TILE_SIZE, 2);
+    g.endFill();
+  }
+
+  private drawBossFloorTile(g: Graphics, x: number, y: number, row: number, col: number) {
+    // Deep void base
+    g.beginFill(0x110820);
+    g.drawRect(x, y, TILE_SIZE, TILE_SIZE);
+    g.endFill();
+    // Stone slab variation
+    const v = (row * 11 + col * 7) % 4;
+    if (v < 2) {
+      g.beginFill(0x1c0e30, 0.7);
+      g.drawRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+      g.endFill();
+    }
+    // Arcane rune border
+    g.lineStyle(1, 0x5500bb, 0.25);
+    g.drawRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.lineStyle(0);
+    // Corner sigil dots
+    if ((row + col) % 4 === 0) {
+      g.beginFill(0x7700dd, 0.18);
+      g.drawCircle(x + 6, y + 6, 2);
+      g.drawCircle(x + TILE_SIZE - 6, y + 6, 2);
+      g.drawCircle(x + 6, y + TILE_SIZE - 6, 2);
+      g.drawCircle(x + TILE_SIZE - 6, y + TILE_SIZE - 6, 2);
+      g.endFill();
+    }
+    // Center glow hint on certain tiles
+    if ((row * 3 + col * 5) % 8 === 0) {
+      g.beginFill(0x4400aa, 0.12);
+      g.drawCircle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, 14);
+      g.endFill();
+    }
+  }
+
+  private drawTrapIndicator(g: Graphics, x: number, y: number) {
+    // Warning hazard overlay
+    g.beginFill(0xcc3300, 0.22);
+    g.drawRect(x + 5, y + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+    g.endFill();
+    // Diagonal warning stripes
+    g.lineStyle(2, 0xff5500, 0.45);
+    const cx = x + TILE_SIZE / 2, cy = y + TILE_SIZE / 2;
+    const r = 14;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      g.lineTo(cx + Math.cos(a + Math.PI / 4) * r * 0.5, cy + Math.sin(a + Math.PI / 4) * r * 0.5);
+    }
+    g.lineStyle(0);
+    // Central spike diamond
+    g.beginFill(0xff6600, 0.5);
+    g.drawPolygon([cx, cy - 9, cx + 7, cy, cx, cy + 9, cx - 7, cy]);
+    g.endFill();
+    g.beginFill(0xffaa44, 0.6);
+    g.drawPolygon([cx, cy - 4, cx + 3, cy, cx, cy + 4, cx - 3, cy]);
+    g.endFill();
+  }
+
+  private drawTorchStatic(g: Graphics, x: number, y: number) {
+    // Wall bracket
+    g.beginFill(0x555566);
+    g.drawRoundedRect(x - 4, y - 4, 8, 6, 2);
+    g.endFill();
+    // Torch pole
+    g.beginFill(0x8b6914);
+    g.drawRoundedRect(x - 3, y - 18, 6, 18, 2);
+    g.endFill();
+    // Torch head (cup)
+    g.beginFill(0x4a3008);
+    g.drawRoundedRect(x - 6, y - 26, 12, 10, 3);
+    g.endFill();
+    g.beginFill(0x6a4810, 0.8);
+    g.drawRoundedRect(x - 5, y - 25, 10, 5, 2);
+    g.endFill();
+    // Base flame (static - animated glow done separately)
+    g.beginFill(0xdd3300, 0.7);
+    g.drawEllipse(x, y - 28, 5, 7);
+    g.endFill();
+    g.beginFill(0xff8800, 0.85);
+    g.drawEllipse(x, y - 29, 3, 5);
+    g.endFill();
+    g.beginFill(0xffee66, 0.9);
+    g.drawEllipse(x, y - 31, 2, 3);
+    g.endFill();
+  }
+
+  private renderToTexture(renderer: Renderer) {
     const c = new Container();
 
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let col = 0; col < MAP_COLS; col++) {
         const tile = this.data[r][col];
         const x = col * TILE_SIZE, y = r * TILE_SIZE;
-        let tex: Texture;
-        if (tile === TILE.WALL) { tex = wallTex; }
-        else if (tile === TILE.BOSS_FLOOR) { tex = bossTex; }
-        else { tex = floorTextures[(r * 7 + col * 13 + r * col) % 3]; }
+        const g = new Graphics();
 
-        const s = new Sprite(tex);
-        s.x = x; s.y = y; s.width = TILE_SIZE; s.height = TILE_SIZE;
-        c.addChild(s);
-
-        // Draw trap indicator
-        if (tile === TILE.TRAP) {
-          const tg = new Graphics();
-          tg.beginFill(0x884422, 0.4);
-          tg.drawRect(x + 8, y + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-          tg.endFill();
-          // Spikes
-          tg.beginFill(0xaaaaaa, 0.6);
-          for (let i = 0; i < 4; i++) {
-            const sx = x + 12 + (i % 2) * 20;
-            const sy = y + 12 + Math.floor(i / 2) * 20;
-            tg.drawPolygon([sx, sy - 5, sx + 4, sy + 3, sx - 4, sy + 3]);
-          }
-          tg.endFill();
-          c.addChild(tg);
+        if (tile === TILE.WALL) {
+          this.drawWallTile(g, x, y, r, col);
+        } else if (tile === TILE.BOSS_FLOOR) {
+          this.drawBossFloorTile(g, x, y, r, col);
+        } else if (tile === TILE.TRAP) {
+          this.drawGrassTile(g, x, y, r, col);
+          this.drawTrapIndicator(g, x, y);
+        } else {
+          this.drawGrassTile(g, x, y, r, col);
         }
+        c.addChild(g);
       }
     }
 
-    // Torches
+    // Torches (static sprites baked into texture)
     for (const [tc, tr] of TORCH_POSITIONS) {
       if (tr < MAP_ROWS && tc < MAP_COLS) {
-        const ts = new Sprite(torchTex);
-        ts.anchor.set(0.5);
-        ts.x = tc * TILE_SIZE + TILE_SIZE / 2;
-        ts.y = tr * TILE_SIZE + TILE_SIZE / 2;
-        ts.width = TILE_SIZE * 0.7; ts.height = TILE_SIZE * 0.7;
-        c.addChild(ts);
+        const g = new Graphics();
+        this.drawTorchStatic(
+          g,
+          tc * TILE_SIZE + TILE_SIZE / 2,
+          tr * TILE_SIZE + TILE_SIZE / 2,
+        );
+        c.addChild(g);
       }
     }
 
-    // Door indicator
-    const gfx = new Graphics();
-    gfx.beginFill(0xaaff88, 0.5);
-    gfx.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
-    gfx.endFill();
-    gfx.beginFill(0xffcc00);
-    const doorCx = 24.5 * TILE_SIZE, doorCy = 28.5 * TILE_SIZE;
-    gfx.drawPolygon([doorCx - 14, doorCy - 10, doorCx + 14, doorCy - 10, doorCx, doorCy + 10]);
-    gfx.endFill();
-    gfx.lineStyle(3, 0x660000, 0.6);
-    gfx.drawRect(TILE_SIZE, 30 * TILE_SIZE, (MAP_COLS - 2) * TILE_SIZE, (MAP_ROWS - 31) * TILE_SIZE);
-    c.addChild(gfx);
+    // Door / boss transition indicator
+    const doorGfx = new Graphics();
+    // Green passage glow
+    doorGfx.beginFill(0x55ee77, 0.3);
+    doorGfx.drawRect(23 * TILE_SIZE, 29 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE);
+    doorGfx.endFill();
+    // Downward chevron arrow
+    const acx = 24.5 * TILE_SIZE, acy = 28.6 * TILE_SIZE;
+    doorGfx.beginFill(0xffee00);
+    doorGfx.drawPolygon([acx - 13, acy - 7, acx + 13, acy - 7, acx, acy + 10]);
+    doorGfx.endFill();
+    doorGfx.beginFill(0xffffff, 0.5);
+    doorGfx.drawPolygon([acx - 7, acy - 5, acx + 7, acy - 5, acx, acy + 4]);
+    doorGfx.endFill();
+    // Boss room border
+    doorGfx.lineStyle(2, 0x6600aa, 0.45);
+    doorGfx.drawRect(TILE_SIZE, 30 * TILE_SIZE, (MAP_COLS - 2) * TILE_SIZE, (MAP_ROWS - 31) * TILE_SIZE);
+    c.addChild(doorGfx);
 
     const rt = RenderTexture.create({ width: this.pixelWidth, height: this.pixelHeight });
     renderer.render(c, { renderTexture: rt });
