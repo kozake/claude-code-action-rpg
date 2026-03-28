@@ -68,6 +68,89 @@ export class ParticleSystem {
     this.damageNums.push({ text: t, vy: isCrit ? -120 : -90, life: isCrit ? 1.3 : 1.0 });
   }
 
+  /** Small dust puff at player's feet while walking */
+  emitFootstep(x: number, y: number) {
+    for (let i = 0; i < 2; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const v = 15 + Math.random() * 25;
+      const life = 0.2 + Math.random() * 0.15;
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y + 14,
+        vx: Math.cos(angle) * v,
+        vy: Math.sin(angle) * v - 10,
+        life, maxLife: life,
+        color: 0x999988,
+        size: 1.5 + Math.random(),
+        gravity: 30,
+      });
+    }
+  }
+
+  /** Ambient environment particles based on floor theme */
+  private ambientTimer = 0;
+  emitAmbient(dt: number, theme: string, cx: number, cy: number, sw: number, sh: number) {
+    this.ambientTimer += dt;
+    // Limit ambient particles
+    const ambientCount = this.particles.filter(p => p.gravity <= 5).length;
+    if (ambientCount > 15) return;
+
+    const interval = 0.25;
+    if (this.ambientTimer < interval) return;
+    this.ambientTimer -= interval;
+
+    const rx = cx + (Math.random() - 0.5) * sw;
+    const ry = cy + (Math.random() - 0.5) * sh;
+
+    switch (theme) {
+      case 'Stone Labyrinth': {
+        // Dust motes drifting down
+        const life = 2 + Math.random();
+        this.particles.push({
+          x: rx, y: ry, vx: (Math.random() - 0.5) * 8, vy: 8 + Math.random() * 5,
+          life, maxLife: life, color: 0x888877, size: 1.2, gravity: 3,
+        });
+        break;
+      }
+      case 'Fire Cavern': {
+        // Rising embers
+        const life = 1.5 + Math.random();
+        this.particles.push({
+          x: rx, y: ry + sh * 0.3, vx: (Math.random() - 0.5) * 15, vy: -30 - Math.random() * 20,
+          life, maxLife: life, color: Math.random() > 0.5 ? 0xff6622 : 0xff9944, size: 1.8, gravity: -5,
+        });
+        break;
+      }
+      case 'Ice Crypt': {
+        // Snowflakes drifting
+        const life = 3 + Math.random();
+        this.particles.push({
+          x: rx, y: ry - sh * 0.3, vx: (Math.random() - 0.5) * 12 + 5, vy: 10 + Math.random() * 8,
+          life, maxLife: life, color: Math.random() > 0.5 ? 0xccddff : 0xffffff, size: 1.5, gravity: 2,
+        });
+        break;
+      }
+      case 'Shadow Depths': {
+        // Dark wisps floating
+        const life = 2.5 + Math.random();
+        this.particles.push({
+          x: rx, y: ry, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
+          life, maxLife: life, color: 0x8844aa, size: 2, gravity: 0,
+        });
+        break;
+      }
+      case 'Demon Throne': {
+        // Golden sparkles
+        const life = 1.5 + Math.random();
+        this.particles.push({
+          x: rx, y: ry, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+          life, maxLife: life, color: Math.random() > 0.5 ? 0xffcc44 : 0xffee88, size: 1.5, gravity: 0,
+        });
+        break;
+      }
+    }
+  }
+
   showLevelUp(x: number, y: number) {
     const t = new Text('LEVEL UP!', {
       fontSize: 18, fill: 0x88ff44, fontWeight: 'bold',

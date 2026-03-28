@@ -53,7 +53,7 @@ export class RangedEnemy extends Enemy {
       }
     }
     if (dist < this.attackRange && this.attackCooldown <= 0) {
-      player.takeDamage(this.damage);
+      player.takeDamage(this.damage, this.x, this.y);
       this.attackCooldown = 1.5;
     }
     if (fire && dist < this.shootRange && this.shootCooldown <= 0) {

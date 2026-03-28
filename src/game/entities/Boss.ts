@@ -92,7 +92,7 @@ export class Boss extends Enemy {
     }
 
     if (dist < this.attackRange && this.attackCooldown <= 0) {
-      player.takeDamage(this.damage);
+      player.takeDamage(this.damage, this.x, this.y);
       this.attackCooldown = this.isEnraged ? 0.35 : this.isAngry ? 0.6 : 1.0;
     }
 
@@ -119,7 +119,7 @@ export class Boss extends Enemy {
       // Deal damage on contact during dash
       const ddx = player.x - this.x, ddy = player.y - this.y;
       if (ddx * ddx + ddy * ddy < (this.w + player.w) * (this.w + player.w) * 0.5) {
-        player.takeDamage(Math.round(this.damage * 1.5));
+        player.takeDamage(Math.round(this.damage * 1.5), this.x, this.y);
       }
       if (this.dashTimer <= 0) {
         this.dashActive = false;
