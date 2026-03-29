@@ -252,13 +252,7 @@ export class AudioManager {
     const bgmIndex = Math.min(Math.floor(floorIndex / 2), FLOOR_BGMS.length - 1);
     const prevBgm = this.currentFloorIndex;
     this.currentFloorIndex = bgmIndex;
-    // Force restart if BGM changed (even if track type is 'field')
-    if (this.currentTrack === 'field' && prevBgm !== bgmIndex) {
-      this.pauseHtml();
-      this.generation++;
-    }
-    this.currentFloorIndex = floorIndex;
-    if (this.currentTrack === 'field') return;
+    // Always restart BGM on floor transition
     this.pauseHtml();
     this.generation++;
     this.currentTrack = 'field';
