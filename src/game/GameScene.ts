@@ -250,14 +250,32 @@ export class GameScene {
     this.boss.container.x = arena.x;
     this.boss.container.y = arena.y;
     this.boss.container.visible = true;
-    this.audio.playBoss();
-    this.shake(15, 0.5);
-    this.hud.triggerFlash(0x440000, 0.8);
     this.map.lockBossRoom();
-    this.bossEntranceTimer = 1.5;
-    this.screenEffects.showLetterbox();
-    this.hud.showMessage('👹 BOSS: 魔王降臨\n覚悟しろ！', 3);
-    setTimeout(() => this.screenEffects.hideLetterbox(), 1500);
+
+    // Set roar animation on boss (wings spread)
+    this.boss.roarAnimTimer = 2.5;
+
+    // Long entrance timer — cinematic will call back to set it to 0
+    this.bossEntranceTimer = 999;
+
+    // Start boss BGM after a brief delay (0.8s into the darken phase)
+    setTimeout(() => this.audio.playBoss(), 900);
+
+    // Initial shake on room lock
+    this.shake(10, 0.4);
+
+    // Start cinematic intro
+    this.screenEffects.startBossIntro(
+      '「魔王ザルガン」降臨',
+      '…ようやく辿り着いたか。\nこの城に踏み込んだ愚か者よ…\n貴様の命、ここで終わりだ！',
+      () => {
+        // Cinematic complete — begin battle
+        this.bossEntranceTimer = 0;
+        this.hud.triggerFlash(0x440000, 0.8);
+        this.shake(18, 0.6);
+        this.hud.showMessage('👹 BOSS: 魔王ザルガン', 2.5);
+      },
+    );
   }
 
   private transitionToNextFloor() {
@@ -366,6 +384,11 @@ export class GameScene {
     this.companion = new Companion(cx, cy);
     this.companion.syncWithPlayer(this.player);
     this.world.addChild(this.companion.container);
+    // Wire up magic shot callback
+    this.companion.onFireMagic = (x, y, vx, vy, damage) => {
+      this.projectiles.addCompanionProjectile(x, y, vx, vy, damage);
+      this.audio.playSfxHit();
+    };
     this.hud.showMessage('✨ 仲間が駆けつけた！', 2.5);
     this.particles.emit(cx, cy, 15, 0xff88cc, 120, 200, 0.5, 0.3, 4);
   }
@@ -493,7 +516,7 @@ export class GameScene {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < enemy.attackRange) {
           this.companion.takeDamage(Math.round(enemy.damage * 0.5), enemy.x, enemy.y);
-          if (this.companion.state === 'downed') {
+          if (this.companion.dead) {
             this.particles.emitHit(this.companion.x, this.companion.y);
           }
         }
@@ -525,11 +548,35 @@ export class GameScene {
     // Boss
     if (!this.boss.dead && this.bossTriggered) {
       if (this.bossEntranceTimer > 0) {
-        this.bossEntranceTimer -= dt;
+        // Still in cinematic — just update boss animations (no AI)
+        this.boss.roarAnimTimer = Math.max(0, this.boss.roarAnimTimer - dt);
       } else {
         const prevCount = this.projectiles.count;
         this.boss.update(dt, this.player, this.map, this.fireFn);
         if (this.projectiles.count > prevCount) {
+          this.audio.playSfxBossShoot();
+        }
+        // Ground slam explosion
+        if (this.boss.groundSlamActive) {
+          this.boss.groundSlamActive = false;
+          const blastX = this.boss.groundSlamX;
+          const blastY = this.boss.groundSlamY;
+          const blastR = this.boss.groundSlamR;
+          // Player hit check
+          const pdx = this.player.x - blastX, pdy = this.player.y - blastY;
+          if (pdx * pdx + pdy * pdy < blastR * blastR) {
+            this.player.takeDamage(this.boss.damage, blastX, blastY);
+          }
+          // Companion hit check
+          if (this.companion && !this.companion.dead) {
+            const cdx = this.companion.x - blastX, cdy = this.companion.y - blastY;
+            if (cdx * cdx + cdy * cdy < blastR * blastR) {
+              this.companion.takeDamage(Math.round(this.boss.damage * 0.6), blastX, blastY);
+            }
+          }
+          this.particles.emitDeath(blastX, blastY, 0xff4400);
+          this.particles.emitDeath(blastX, blastY, 0xff8800);
+          this.shake(10, 0.35);
           this.audio.playSfxBossShoot();
         }
       }
@@ -542,7 +589,7 @@ export class GameScene {
       const wasInv = this.player.invincibleTime > (1.2 - 0.01);
       if (!wasInv) { this.shake(6, 0.25); this.particles.emitHit(this.player.x, this.player.y); this.audio.playSfxPlayerHurt(); }
     }
-    // Player projectile hits on enemies
+    // Player/companion projectile hits on enemies
     const projEnemyHits = this.projectiles.checkHitEnemies(this.enemies);
     for (const { enemy, damage } of projEnemyHits) {
       enemy.takeDamage(damage);
@@ -552,6 +599,16 @@ export class GameScene {
         this.particles.emitDeath(enemy.x, enemy.y, 0x44cc44);
         this.player.addXp(enemy.xpReward);
         this.items.dropFromEnemy(enemy.x, enemy.y);
+      }
+    }
+    // Player/companion projectile hits on boss
+    if (this.bossTriggered && !this.boss.dead && this.bossEntranceTimer <= 0) {
+      const projBossHits = this.projectiles.checkHitEnemies([this.boss]);
+      for (const { damage } of projBossHits) {
+        this.boss.takeDamage(damage);
+        this.particles.emitHit(this.boss.x, this.boss.y);
+        this.particles.showDamage(this.boss.x, this.boss.y, damage, true);
+        this.audio.playSfxHit();
       }
     }
 
