@@ -11,6 +11,10 @@ export class Minimap {
   private screenW: number;
   private mapCols = 0;
   private mapRows = 0;
+  private stairsCol = -1;
+  private stairsRow = -1;
+  private stairsVisible = false;
+  private blinkTimer = 0;
 
   constructor(screenW: number, _screenH: number, map: WorldMap) {
     this.screenW = screenW;
@@ -29,6 +33,17 @@ export class Minimap {
   rebuild(map: WorldMap) {
     this.buildBackground(map);
     this.updatePosition();
+    this.stairsVisible = false;
+    this.stairsCol = -1;
+    this.stairsRow = -1;
+  }
+
+  /** Mark stairs as visible for blinking effect */
+  showStairs(col: number, row: number) {
+    this.stairsCol = col;
+    this.stairsRow = row;
+    this.stairsVisible = true;
+    this.blinkTimer = 0;
   }
 
   private buildBackground(map: WorldMap) {
@@ -67,15 +82,45 @@ export class Minimap {
   }
 
   update(
+    dt: number,
     playerX: number, playerY: number,
     enemies: { x: number; y: number; dead: boolean }[],
     boss: { x: number; y: number; dead: boolean } | null,
     bossTriggered: boolean,
+    companion?: { x: number; y: number; state: string } | null,
   ) {
     const g = this.dynamic;
     g.clear();
 
     const TILE_SIZE = 48;
+
+    // Stairs blinking & ripple effect
+    if (this.stairsVisible && this.stairsCol >= 0) {
+      this.blinkTimer += dt;
+      const sx = (this.stairsCol + 0.5) * MM_SCALE;
+      const sy = (this.stairsRow + 0.5) * MM_SCALE;
+
+      // Pulsing glow
+      const pulse = 0.5 + 0.5 * Math.sin(this.blinkTimer * 5);
+      g.beginFill(0x44ddaa, 0.3 + 0.4 * pulse);
+      g.drawCircle(sx, sy, 5 + pulse * 2);
+      g.endFill();
+
+      // Expanding ripple rings
+      for (let i = 0; i < 2; i++) {
+        const phase = (this.blinkTimer * 1.5 + i * 0.5) % 1.0;
+        const rippleR = 4 + phase * 12;
+        const rippleAlpha = (1 - phase) * 0.4;
+        g.lineStyle(1, 0x44ddaa, rippleAlpha);
+        g.drawCircle(sx, sy, rippleR);
+        g.lineStyle(0);
+      }
+
+      // Bright center dot
+      g.beginFill(0x88ffcc, 0.7 + 0.3 * pulse);
+      g.drawCircle(sx, sy, 2);
+      g.endFill();
+    }
 
     // Enemies as red dots
     for (const e of enemies) {
@@ -93,6 +138,15 @@ export class Minimap {
       const by = (boss.y / TILE_SIZE) * MM_SCALE;
       g.beginFill(0xffdd00);
       g.drawRect(bx - 2, by - 2, 4, 4);
+      g.endFill();
+    }
+
+    // Companion as pink dot
+    if (companion && companion.state !== 'downed') {
+      const cpx = (companion.x / TILE_SIZE) * MM_SCALE;
+      const cpy = (companion.y / TILE_SIZE) * MM_SCALE;
+      g.beginFill(0xff88cc);
+      g.drawCircle(cpx, cpy, 2);
       g.endFill();
     }
 

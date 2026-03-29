@@ -31,6 +31,13 @@ export class HUD {
   private screenW: number;
   private screenH: number;
 
+  // Stairs indicator
+  private stairsIndicator: Graphics;
+  private stairsActive = false;
+  private stairsWorldX = 0;
+  private stairsWorldY = 0;
+  private stairsTimer = 0;
+
   constructor(screenW: number, screenH: number) {
     this.screenW = screenW;
     this.screenH = screenH;
@@ -117,6 +124,10 @@ export class HUD {
     this.flashGfx = new Graphics();
     this.flashGfx.alpha = 0;
 
+    // ── Stairs indicator arrow ────────────────────────────────────────────────
+    this.stairsIndicator = new Graphics();
+    this.stairsIndicator.visible = false;
+
     // Add to container
     this.container.addChild(this.hpBar);
     this.container.addChild(this.hpText);
@@ -128,6 +139,7 @@ export class HUD {
     this.container.addChild(this.bossPanel);
     this.container.addChild(this.comboText);
     this.container.addChild(this.msgText);
+    this.container.addChild(this.stairsIndicator);
     this.container.addChild(this.flashGfx);
 
     this.layoutBossPanel();
@@ -327,6 +339,101 @@ export class HUD {
     this.msgText.text = text;
     this.msgText.visible = true;
     this.msgTimer = duration;
+  }
+
+  /** Activate stairs direction indicator */
+  setStairsTarget(worldX: number, worldY: number) {
+    this.stairsActive = true;
+    this.stairsWorldX = worldX;
+    this.stairsWorldY = worldY;
+  }
+
+  /** Deactivate stairs indicator (e.g. on floor change) */
+  clearStairsTarget() {
+    this.stairsActive = false;
+    this.stairsIndicator.visible = false;
+  }
+
+  /** Update stairs arrow (called from main update) */
+  updateStairsIndicator(
+    dt: number,
+    playerX: number, playerY: number,
+    cameraX: number, cameraY: number,
+  ) {
+    if (!this.stairsActive) { this.stairsIndicator.visible = false; return; }
+
+    this.stairsTimer += dt;
+
+    // Stairs position in screen space
+    const sx = this.stairsWorldX - cameraX;
+    const sy = this.stairsWorldY - cameraY;
+    const margin = 40;
+
+    // If stairs are visible on screen, don't show arrow
+    if (sx >= margin && sx <= this.screenW - margin && sy >= margin && sy <= this.screenH - margin) {
+      this.stairsIndicator.visible = false;
+      return;
+    }
+
+    this.stairsIndicator.visible = true;
+
+    // Direction from screen center to stairs
+    const dx = this.stairsWorldX - playerX;
+    const dy = this.stairsWorldY - playerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
+
+    const angle = Math.atan2(dy, dx);
+    const edgeMargin = 50;
+
+    // Clamp arrow to screen edge
+    const cx = this.screenW / 2;
+    const cy = this.screenH / 2;
+    const maxX = this.screenW - edgeMargin;
+    const maxY = this.screenH - edgeMargin;
+    let ax = cx + Math.cos(angle) * (this.screenW * 0.42);
+    let ay = cy + Math.sin(angle) * (this.screenH * 0.42);
+    ax = Math.max(edgeMargin, Math.min(maxX, ax));
+    ay = Math.max(edgeMargin, Math.min(maxY, ay));
+
+    // Pulsing alpha
+    const pulse = 0.6 + 0.4 * Math.sin(this.stairsTimer * 4);
+
+    const g = this.stairsIndicator;
+    g.clear();
+    g.alpha = pulse;
+
+    // Draw arrow triangle pointing toward stairs
+    const arrowSize = 14;
+    g.beginFill(0x44ddaa);
+    g.moveTo(
+      ax + Math.cos(angle) * arrowSize,
+      ay + Math.sin(angle) * arrowSize,
+    );
+    g.lineTo(
+      ax + Math.cos(angle + 2.5) * arrowSize,
+      ay + Math.sin(angle + 2.5) * arrowSize,
+    );
+    g.lineTo(
+      ax + Math.cos(angle - 2.5) * arrowSize,
+      ay + Math.sin(angle - 2.5) * arrowSize,
+    );
+    g.closePath();
+    g.endFill();
+
+    // Glow circle behind arrow
+    g.beginFill(0x44ddaa, 0.25);
+    g.drawCircle(ax, ay, arrowSize + 6);
+    g.endFill();
+
+    // Distance text (tiles)
+    const tileDist = Math.round(dist / 48);
+    if (tileDist > 3) {
+      g.beginFill(0x44ddaa, 0.9);
+      // Small dot to indicate distance
+      g.drawCircle(ax - Math.cos(angle) * 20, ay - Math.sin(angle) * 20, 3);
+      g.endFill();
+    }
   }
 
   triggerFlash(color = 0xff0000, intensity = 0.7) {
