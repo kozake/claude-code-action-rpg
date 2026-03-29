@@ -6,6 +6,7 @@ import { Enemy } from './entities/Enemy';
 import { RangedEnemy } from './entities/RangedEnemy';
 import { Boss } from './entities/Boss';
 import { ChargerEnemy, BomberEnemy, ShieldEnemy, SummonerEnemy } from './entities/SpecialEnemies';
+import { Companion } from './entities/Companion';
 import { VirtualJoystick } from '../ui/VirtualJoystick';
 import { AttackButton } from '../ui/AttackButton';
 import { HUD } from '../ui/HUD';
@@ -52,6 +53,8 @@ export class GameScene {
   private screenW: number;
   private screenH: number;
 
+  private companion: Companion | null = null;
+  private companionSpawned = false;
   private bossTriggered = false;
   private state: GameState = 'title';
 
@@ -180,7 +183,7 @@ export class GameScene {
     overlay.addChild(title);
 
     const sub = new Text(
-      '全5階のダンジョンを踏破し\n魔王を倒せ！\n\nスマホ: 左で移動 / 右⚔で攻撃 / 💨でスキル\nPC: WASD移動 / Space攻撃 / Xスキル\n\nタップまたはキーでスタート',
+      '全10階のダンジョンを踏破し\n魔王を倒せ！\n\nスマホ: 左で移動 / 右⚔で攻撃 / 💨でスキル\nPC: WASD移動 / Space攻撃 / Xスキル\n\nタップまたはキーでスタート',
       { fontSize: 15, fill: 0xffffff, align: 'center', stroke: 0x000000, strokeThickness: 3, lineHeight: 22 },
     );
     sub.anchor.set(0.5);
@@ -202,6 +205,11 @@ export class GameScene {
         this.map.showStairs();
         this.hud.showMessage('🚪 階段が現れた！\n次の階へ進め！', 3);
         this.audio.playSfxStairs();
+        // Activate stairs navigation indicators
+        const stairsX = this.map.stairsCol * TILE_SIZE + TILE_SIZE / 2;
+        const stairsY = this.map.stairsRow * TILE_SIZE + TILE_SIZE / 2;
+        this.hud.setStairsTarget(stairsX, stairsY);
+        this.minimap.showStairs(this.map.stairsCol, this.map.stairsRow);
       }
       return;
     }
@@ -295,6 +303,21 @@ export class GameScene {
         this.waveActive = false;
         this.waveDelay = 0;
         this.allWavesCleared = false;
+        this.hud.clearStairsTarget();
+
+        // Reset companion position
+        if (this.companion) {
+          this.companion.x = spawn.x - 40;
+          this.companion.y = spawn.y;
+          this.companion.container.x = this.companion.x;
+          this.companion.container.y = this.companion.y;
+          // Heal companion on floor transition
+          if (this.companion.state === 'downed' || this.companion.state === 'reviving') {
+            this.companion.state = 'follow';
+            this.companion.dead = false;
+          }
+          this.companion.heal(Math.round(this.companion.maxHp * 0.3));
+        }
 
         // Rebuild minimap
         this.minimap.rebuild(this.map);
@@ -335,6 +358,16 @@ export class GameScene {
         return new Enemy(x, y, hp, spd, 40, 38, 20, 36, 36);
       }
     }
+  }
+
+  private spawnCompanion() {
+    const cx = this.player.x - this.player.facingX * 50;
+    const cy = this.player.y - this.player.facingY * 50;
+    this.companion = new Companion(cx, cy);
+    this.companion.syncWithPlayer(this.player);
+    this.world.addChild(this.companion.container);
+    this.hud.showMessage('✨ 仲間が駆けつけた！', 2.5);
+    this.particles.emit(cx, cy, 15, 0xff88cc, 120, 200, 0.5, 0.3, 4);
   }
 
   private shake(intensity: number, duration = 0.25) {
@@ -410,6 +443,13 @@ export class GameScene {
       this.audio.playSfxPlayerHurt();
     }
 
+    // Companion update
+    if (this.companion) {
+      this.companion.syncWithPlayer(this.player);
+      this.companion.update(dt, this.player, this.enemies, this.map);
+      this.handleCompanionAttacks();
+    }
+
     // Player attacks
     this.handlePlayerAttacks(dt);
 
@@ -441,6 +481,22 @@ export class GameScene {
       if (skills.length > 0) {
         this.state = 'skill_select';
         this.skillSelect.show(skills);
+      }
+    }
+
+    // Enemy damage to companion (contact damage)
+    if (this.companion && this.companion.state !== 'downed' && this.companion.state !== 'reviving') {
+      for (const enemy of this.enemies) {
+        if (enemy.dead) continue;
+        const dx = enemy.x - this.companion.x;
+        const dy = enemy.y - this.companion.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < enemy.attackRange) {
+          this.companion.takeDamage(Math.round(enemy.damage * 0.5), enemy.x, enemy.y);
+          if (this.companion.state === 'downed') {
+            this.particles.emitHit(this.companion.x, this.companion.y);
+          }
+        }
       }
     }
 
@@ -505,6 +561,12 @@ export class GameScene {
       if (allDead) {
         this.waveActive = false;
         this.waveDelay = 1.5;
+
+        // Spawn companion after first wave clear
+        if (!this.companionSpawned) {
+          this.companionSpawned = true;
+          this.spawnCompanion();
+        }
       }
     }
     if (!this.waveActive && !this.allWavesCleared && this.waveDelay > 0) {
@@ -602,10 +664,11 @@ export class GameScene {
     this.particles.update(dt, this.cameraX, this.cameraY);
 
     // Minimap
-    this.minimap.update(this.player.x, this.player.y, this.enemies, this.boss, this.bossTriggered);
+    this.minimap.update(dt, this.player.x, this.player.y, this.enemies, this.boss, this.bossTriggered, this.companion);
 
     // HUD
     this.hud.update(dt, this.player, this.bossTriggered && !this.boss.dead ? this.boss : null);
+    this.hud.updateStairsIndicator(dt, this.player.x, this.player.y, this.cameraX, this.cameraY);
   }
 
   private handlePlayerAttacks(dt: number) {
@@ -713,6 +776,45 @@ export class GameScene {
         this.player.facingX * speed, this.player.facingY * speed,
         this.player.skills.rangedSlashDamage,
       );
+    }
+  }
+
+  private handleCompanionAttacks() {
+    if (!this.companion) return;
+    const hb = this.companion.getAttackHitbox();
+    if (!hb) return;
+
+    // Check enemies
+    for (const enemy of this.enemies) {
+      if (enemy.dead) continue;
+      if (!this.circleHit(hb, enemy)) continue;
+
+      // Shield check
+      if (enemy instanceof ShieldEnemy && (enemy as ShieldEnemy).isBlocked(hb.cx, hb.cy)) continue;
+
+      const damage = this.companion.attackDamage;
+      enemy.takeDamage(damage);
+      enemy.applyKnockback(this.companion.x, this.companion.y, 150);
+      this.particles.emitHit(hb.cx, hb.cy);
+      this.particles.showDamage(enemy.x, enemy.y, damage, false);
+      this.audio.playSfxHit();
+
+      if (enemy.dead) {
+        this.particles.emitDeath(enemy.x, enemy.y, 0x44cc44);
+        this.player.addXp(enemy.xpReward);
+        this.items.dropFromEnemy(enemy.x, enemy.y);
+        this.audio.playSfxEnemyDeath();
+      }
+    }
+
+    // Check boss
+    if (!this.boss.dead && this.bossTriggered && this.circleHit(hb, this.boss)) {
+      const damage = this.companion.attackDamage;
+      this.boss.takeDamage(damage);
+      this.boss.applyKnockback(this.companion.x, this.companion.y, 50);
+      this.particles.emitHit(hb.cx, hb.cy);
+      this.particles.showDamage(this.boss.x, this.boss.y, damage, true);
+      this.audio.playSfxHit();
     }
   }
 

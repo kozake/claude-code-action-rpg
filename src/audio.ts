@@ -248,14 +248,12 @@ export class AudioManager {
 
   /** Play floor-specific BGM. Uses field audio file but with floor-specific synth fallback. */
   playFloor(floorIndex: number) {
-    this.currentFloorIndex = floorIndex;
-    // Boss floor uses boss BGM
-    if (floorIndex >= FLOOR_BGMS.length) {
-      this.playBoss();
-      return;
-    }
-    // Force restart if floor changed (even if track type is 'field')
-    if (this.currentTrack === 'field' && this.currentFloorIndex !== floorIndex) {
+    // Map floor index to BGM index (2 floors per theme, 4 BGM tracks)
+    const bgmIndex = Math.min(Math.floor(floorIndex / 2), FLOOR_BGMS.length - 1);
+    const prevBgm = this.currentFloorIndex;
+    this.currentFloorIndex = bgmIndex;
+    // Force restart if BGM changed (even if track type is 'field')
+    if (this.currentTrack === 'field' && prevBgm !== bgmIndex) {
       this.pauseHtml();
       this.generation++;
     }
