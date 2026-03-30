@@ -528,23 +528,28 @@ export class Player {
     }
 
     // ── Sword ─────────────────────────────────────────────────────────────────
-    // Drawn in world-facing direction (unaffected by bodyGfx scale flip)
-    const sx1 = this.facingX * 12, sy1 = this.facingY * 12;
-    const sx2 = this.facingX * 28, sy2 = this.facingY * 28;
+    // Blade length scales with attackRange (base 64 → 28px, each +20 range → +8px longer)
+    const bladeScale = this.attackRange / 64;
+    const bladeStart = 12;
+    const bladeEnd = 28 * bladeScale;
+    const bladeWidth = 3 + (bladeScale - 1) * 2; // Wider blade for greatsword
+    const sx1 = this.facingX * bladeStart, sy1 = this.facingY * bladeStart;
+    const sx2 = this.facingX * bladeEnd, sy2 = this.facingY * bladeEnd;
     // Sword glow
-    this.bodyGfx.lineStyle(7, accentColor, 0.18);
+    this.bodyGfx.lineStyle(7 + (bladeScale - 1) * 4, accentColor, 0.18);
     this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2, sy2);
     // Blade
-    this.bodyGfx.lineStyle(3, 0xffee66, 0.95);
+    this.bodyGfx.lineStyle(bladeWidth, 0xffee66, 0.95);
     this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2, sy2);
     // Shine
     this.bodyGfx.lineStyle(1.5, 0xffffff, 0.6);
     this.bodyGfx.moveTo(sx1, sy1); this.bodyGfx.lineTo(sx2 - this.facingX * 4, sy2 - this.facingY * 4);
-    // Guard
+    // Guard (wider for greatsword)
+    const guardSize = 7 + (bladeScale - 1) * 4;
     const perpX = -this.facingY, perpY = this.facingX;
-    this.bodyGfx.lineStyle(3, 0xcc8800, 0.9);
-    this.bodyGfx.moveTo(sx1 + perpX * 7, sy1 + perpY * 7);
-    this.bodyGfx.lineTo(sx1 - perpX * 7, sy1 - perpY * 7);
+    this.bodyGfx.lineStyle(bladeWidth, 0xcc8800, 0.9);
+    this.bodyGfx.moveTo(sx1 + perpX * guardSize, sy1 + perpY * guardSize);
+    this.bodyGfx.lineTo(sx1 - perpX * guardSize, sy1 - perpY * guardSize);
     this.bodyGfx.lineStyle(0);
 
     // ── Attack effects ────────────────────────────────────────────────────────
@@ -602,6 +607,29 @@ export class Player {
       const sweepEnd = baseAngle + 0.85;
       const currentSweep = sweepStart + (sweepEnd - sweepStart) * (1 - progress);
 
+      // ── Hit range fan (filled arc showing actual attack area) ──
+      const hitCx = this.facingX * this.attackRange * 0.6;
+      const hitCy = this.facingY * this.attackRange * 0.6;
+      const hitR = r;
+      const fanAlpha = 0.12 * progress;
+      this.attackGfx.lineStyle(0);
+      this.attackGfx.beginFill(accentColor, fanAlpha);
+      this.attackGfx.moveTo(hitCx, hitCy);
+      const fanSegments = 20;
+      for (let i = 0; i <= fanSegments; i++) {
+        const a = sweepStart + (sweepEnd - sweepStart) * (i / fanSegments);
+        this.attackGfx.lineTo(
+          hitCx + Math.cos(a) * hitR,
+          hitCy + Math.sin(a) * hitR,
+        );
+      }
+      this.attackGfx.lineTo(hitCx, hitCy);
+      this.attackGfx.endFill();
+      // Hit range border
+      this.attackGfx.lineStyle(1.5, accentColor, 0.25 * progress);
+      this.attackGfx.arc(hitCx, hitCy, hitR, sweepStart, sweepEnd);
+
+      // ── Slash trail arc ──
       // Outer glow arc
       this.attackGfx.lineStyle(12, accentColor, 0.18 * progress);
       this.attackGfx.arc(0, 0, r * 0.82, sweepStart, currentSweep);
@@ -621,13 +649,6 @@ export class Player {
       this.attackGfx.endFill();
       this.attackGfx.beginFill(accentColor, 0.5 * progress);
       this.attackGfx.drawCircle(tipX, tipY, 9 * progress);
-      this.attackGfx.endFill();
-
-      // Center hitbox glow
-      const ax = this.facingX * this.attackRange * 0.6;
-      const ay = this.facingY * this.attackRange * 0.6;
-      this.attackGfx.beginFill(accentColor, 0.15 * progress);
-      this.attackGfx.drawCircle(ax, ay, r * 0.55);
       this.attackGfx.endFill();
     }
   }
